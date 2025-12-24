@@ -31,9 +31,7 @@ const ZunoApp: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 md:ml-64 p-4 md:p-8 pt-6 pb-32 overflow-y-auto h-screen bg-zuno-main scroll-smooth">
-        <header className="flex md:hidden justify-between items-center mb-6 sticky top-0 bg-zuno-black/80 backdrop-blur-md py-4 z-30 -mx-4 px-4 border-b border-white/5">
-          <Logo className="h-6 text-white" />
-        </header>
+
 
         {renderView()}
       </main>

@@ -7,6 +7,22 @@ export interface Track {
   duration: number; // seconds
   streamUrl?: string; // Optional because it is fetched on demand
   quality?: string;
+  quality?: string;
+  // Recommendation Engine Fields
+  genre: string[];
+  bpm: number;
+  energy: number;
+  valence: number;
+  popularity: number;
+}
+
+export enum ContextType {
+  Morning = 'Morning',
+  Focus = 'Focus',
+  Workout = 'Workout',
+  Party = 'Party',
+  Chill = 'Chill',
+  Rainy = 'Rainy'
 }
 
 export interface Album {

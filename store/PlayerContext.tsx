@@ -67,6 +67,23 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
   }, []); // Empty dependency array ok here as we use refs/state setters
 
+  // Track History Logic
+  useEffect(() => {
+    if (!currentTrack) return;
+
+    // Reset timer on new track
+    const startTime = Date.now();
+
+    return () => {
+      // When track changes (component unmounts or track updates), calculate time
+      const timeListened = (Date.now() - startTime) / 1000;
+      // Dynamic Import to avoid circular deps if possible, or just strict import
+      import('../services/zunoApi').then(({ ZunoAPI }) => {
+        ZunoAPI.recordPlay(currentTrack, timeListened);
+      });
+    };
+  }, [currentTrack]);
+
   const playTrack = async (track: Track) => {
     if (!audioRef.current) return;
 
