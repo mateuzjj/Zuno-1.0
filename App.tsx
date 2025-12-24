@@ -11,17 +11,26 @@ import { ImageEditor } from './pages/ImageEditor';
 import { Logo } from './components/UI/Logo';
 import { View } from './types';
 
+import { ArtistPage } from './pages/Artist';
+
 // Main App component that handles "routing" via state for simplicity in this SPA demo
 const ZunoApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
+  const [artistId, setArtistId] = useState<string | null>(null);
+
+  const handleNavigate = (view: View, id?: string) => {
+    if (id) setArtistId(id);
+    setCurrentView(view);
+  };
 
   const renderView = () => {
     switch (currentView) {
-      case 'home': return <Home />;
-      case 'search': return <Search />;
+      case 'home': return <Home onNavigate={handleNavigate} />;
+      case 'search': return <Search />; // Likely needs nav too later
       case 'library': return <Library />;
       case 'editor': return <ImageEditor />;
-      default: return <Home />;
+      case 'artist': return artistId ? <ArtistPage artistId={artistId} /> : <div className="text-white p-8">No Artist Selected</div>;
+      default: return <Home onNavigate={handleNavigate} />;
     }
   };
 

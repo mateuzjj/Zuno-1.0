@@ -24,6 +24,9 @@ export const ZunoAPI = {
             AI.analyzeRequest(query)
         ]);
 
+        // Save to history
+        ZunoAPI.saveSearch(query);
+
         const { context, similarEntities, intent } = analysis;
 
         // 2. Expansion: If AI suggests similar artists, fetch them too
@@ -35,15 +38,29 @@ export const ZunoAPI = {
             similarResults = expansionResults.flat().filter(t => !catalogResults.find(c => c.id === t.id));
         }
 
-        // 3. Fallback/Context: Get specific AI recommendations for this mood
-        const aiResults = Engine.getTracksByContext(context);
+        // 2b. Artist Refine: If catalog is sparse and AI detected an artist, refine the search
+        if (catalogResults.length < 5 && intent === 'artist' && analysis.primaryEntity) {
+            const artistRefine = await api.search(analysis.primaryEntity);
+            // Add non-duplicates to catalog
+            const newTracks = artistRefine.filter(t => !catalogResults.find(c => c.id === t.id));
+            catalogResults.push(...newTracks);
+        }
+
+        // 3. Personalization: Rank ALL results by user taste
+        // We do this LATE to ensure we rank the final candidates
+        const userProfile = await ZunoAPI.getUserProfile();
+        const rankedCatalog = Engine.rankTracks(catalogResults, userProfile);
+        const rankedSimilar = Engine.rankTracks(similarResults, userProfile);
+
+        // 4. Fallback/Context: Get specific AI recommendations for this mood
+        const aiResults = Engine.rankTracks(Engine.getTracksByContext(context), userProfile);
 
         return {
             context,
             intent,
             analysis, // return full analysis for UI messages
-            catalogResults,
-            similarResults, // New: "You might also like..."
+            catalogResults: rankedCatalog.length > 0 ? rankedCatalog : catalogResults,
+            similarResults: rankedSimilar.length > 0 ? rankedSimilar : similarResults,
             aiResults
         };
     },
@@ -56,11 +73,36 @@ export const ZunoAPI = {
      * Generates the next section for the Home Feed.
      * Uses a rotation of strategies to keep the feed fresh.
      */
-    getNextFeedSection: async (offset: number) => {
-        const strategies = ['mood', 'genre', 'artist_mix', 'discovery'];
+    getNextFeedSection: async (offset: number, excludeIds: string[] = []) => {
+        const strategies = ['mood', 'genre', 'artist_mix', 'discovery', 'recent_search', 'decade'];
         const strategy = strategies[offset % strategies.length];
 
         await new Promise(r => setTimeout(r, 600)); // Simulate AI "thinking"
+
+        // Helper to filter duplicates and RANK by user taste
+        const processTracks = async (rawTracks: Track[]) => {
+            const unique = rawTracks.filter(t => !excludeIds.includes(t.id));
+            const profile = await ZunoAPI.getUserProfile();
+            return Engine.rankTracks(unique, profile);
+        };
+
+        if (strategy === 'recent_search') {
+            const searches = ZunoAPI.getRecentSearches();
+            if (searches.length > 0) {
+                const query = searches[Math.floor(Math.random() * searches.length)];
+                try {
+                    let tracks = await api.search(query);
+                    tracks = await processTracks(tracks);
+                    return {
+                        title: `Based on your search for "${query}"`,
+                        subtitle: 'Picks inspired by your curiosity',
+                        tracks: tracks.slice(0, 10)
+                    };
+                } catch (e) {
+                    // Fallthrough
+                }
+            }
+        }
 
         if (strategy === 'mood') {
             const moodMap: Record<string, string[]> = {
@@ -119,10 +161,24 @@ export const ZunoAPI = {
             };
         }
 
+        if (strategy === 'decade') {
+            const decades = ['80s Hits', '90s Hits', '2000s Throwback', '2010s Hits', '70s Classic Rock'];
+            const decade = decades[Math.floor(Math.random() * decades.length)];
+            let tracks = await api.search(decade);
+            tracks = await processTracks(tracks);
+
+            return {
+                title: `Time Machine: ${decade}`,
+                subtitle: 'Nostalgia Trip',
+                tracks: tracks.slice(0, 10)
+            };
+        }
+
         // Discovery / Random
         const seeds = ['Top 50', 'Viral Hits', 'New Releases', 'Hidden Gems'];
         const seed = seeds[Math.floor(Math.random() * seeds.length)];
-        const tracks = await api.search(seed);
+        let tracks = await api.search(seed);
+        tracks = await processTracks(tracks);
 
         return {
             title: `Discover: ${seed}`,
@@ -152,6 +208,17 @@ export const ZunoAPI = {
         localStorage.setItem('zuno_history', JSON.stringify(newHistory));
     },
 
+    saveSearch: (query: string) => {
+        if (!query || query.length < 3) return;
+        const history = JSON.parse(localStorage.getItem('zuno_search_history') || '[]');
+        const newHistory = [query, ...history.filter((q: string) => q.toLowerCase() !== query.toLowerCase())].slice(0, 20);
+        localStorage.setItem('zuno_search_history', JSON.stringify(newHistory));
+    },
+
+    getRecentSearches: (): string[] => {
+        return JSON.parse(localStorage.getItem('zuno_search_history') || '[]');
+    },
+
     /**
      * Gets valid history for recommendations.
      * Filters are already applied at write-time (recordPlay).
@@ -163,5 +230,9 @@ export const ZunoAPI = {
     getUserProfile: async () => {
         const history = JSON.parse(localStorage.getItem('zuno_history') || '[]');
         return Engine.calculateUserVector(history);
-    }
+    },
+
+    // New Search Passthroughs
+    searchArtists: (query: string) => api.searchArtists(query),
+    getArtist: (id: string) => api.getArtist(id)
 };

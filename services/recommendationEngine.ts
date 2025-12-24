@@ -57,3 +57,26 @@ export const calculateUserVector = (history: Track[]) => {
 
     return { energy: avgEnergy, valence: avgValence, bpm: avgBpm };
 };
+
+// 4. Personalization: Rank Tracks by User Taste
+export const rankTracks = (tracks: Track[], userProfile: { energy: number, valence: number, bpm: number }): Track[] => {
+    if (!userProfile) return tracks;
+
+    // Helper: Calculate similarity score (inverse distance)
+    // We normalize BPM to a 0-1 range roughly (assuming 60-180 bpm range) for fair comparison with energy/valence
+    const getScore = (t: Track) => {
+        const bpmNorm = Math.min(Math.max((t.bpm - 60) / 120, 0), 1);
+        const userBpmNorm = Math.min(Math.max((userProfile.bpm - 60) / 120, 0), 1);
+
+        const energyDiff = Math.abs(t.energy - userProfile.energy);
+        const valenceDiff = Math.abs(t.valence - userProfile.valence);
+        const bpmDiff = Math.abs(bpmNorm - userBpmNorm);
+
+        // Lower diff is better. Weighted sum (Energy is often most impactful for "Vibe")
+        const distance = (energyDiff * 1.5) + (valenceDiff * 1.0) + (bpmDiff * 0.5);
+        return distance;
+    };
+
+    // Sort by ascending distance (closest match first)
+    return [...tracks].sort((a, b) => getScore(a) - getScore(b));
+};

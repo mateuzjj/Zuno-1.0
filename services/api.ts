@@ -16,6 +16,47 @@ const API_INSTANCES = [
 
 const RATE_LIMIT_ERROR_MESSAGE = 'Too Many Requests. Please wait a moment and try again.';
 
+// Helper to normalize response (from Monochrome)
+function normalizeSearchResponse(data: any, key: string) {
+  // Basic recursion to find the section
+  const findSection = (source: any, k: string, visited: Set<any>): any => {
+    if (!source || typeof source !== 'object') return;
+    if (Array.isArray(source)) {
+      for (const e of source) {
+        const f = findSection(e, k, visited);
+        if (f) return f;
+      }
+      return;
+    }
+    if (visited.has(source)) return;
+    visited.add(source);
+    if ('items' in source && Array.isArray(source.items)) return source;
+    if (k in source) {
+      const f = findSection(source[k], k, visited);
+      if (f) return f;
+    }
+    for (const v of Object.values(source)) {
+      const f = findSection(v, k, visited);
+      if (f) return f;
+    }
+  };
+
+  const section = findSection(data, key, new Set());
+  const items = section?.items ?? [];
+  return {
+    items,
+    limit: section?.limit ?? items.length,
+    offset: section?.offset ?? 0,
+    totalNumberOfItems: section?.totalNumberOfItems ?? items.length
+  };
+}
+
+function getArtistPictureUrl(id: string | undefined, size = '750'): string {
+  if (!id) return `https://picsum.photos/seed/${Math.random()}/${size}`;
+  const formattedId = id.replace(/-/g, '/');
+  return `https://resources.tidal.com/images/${formattedId}/${size}x${size}.jpg`;
+}
+
 // Helper to delay retry
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -129,10 +170,11 @@ export const api = {
     });
   },
 
-  // Real Search Implementation
+  // Real Search Implementation with Relevance Boost
   search: async (query: string): Promise<Track[]> => {
     try {
-      const response = await fetchWithRetry(`/search/?s=${encodeURIComponent(query)}&limit=10`);
+      const normalizedQuery = query.trim().toLowerCase();
+      const response = await fetchWithRetry(`/search/?s=${encodeURIComponent(query)}&limit=25`);
       const data = await response.json();
 
       let items: any[] = [];
@@ -149,11 +191,145 @@ export const api = {
         items = data;
       }
 
-      return items.map((t: any) => mapApiTrackToTrack(t));
+      let tracks = items.map((t: any) => mapApiTrackToTrack(t));
+
+      // Deduplication: Remove duplicates based on title + artist
+      const seen = new Set<string>();
+      tracks = tracks.filter(t => {
+        const key = `${t.title?.toLowerCase()}_${t.artist?.toLowerCase()}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      // Relevance Boost: Tracks where artist or title matches query exactly go first
+      tracks.sort((a, b) => {
+        const aArtistMatch = a.artist?.toLowerCase().includes(normalizedQuery) ? 1 : 0;
+        const aTitleMatch = a.title?.toLowerCase().includes(normalizedQuery) ? 1 : 0;
+        const bArtistMatch = b.artist?.toLowerCase().includes(normalizedQuery) ? 1 : 0;
+        const bTitleMatch = b.title?.toLowerCase().includes(normalizedQuery) ? 1 : 0;
+
+        const aScore = (aArtistMatch * 2) + aTitleMatch; // Artist match is more important
+        const bScore = (bArtistMatch * 2) + bTitleMatch;
+
+        return bScore - aScore; // Higher score first
+      });
+
+      return tracks;
 
     } catch (error) {
       console.warn("API Search failed", error);
       return [];
+    }
+  },
+
+  // Artist Search
+  searchArtists: async (query: string): Promise<any[]> => {
+    try {
+      const response = await fetchWithRetry(`/search/?a=${encodeURIComponent(query)}&limit=10`);
+      const data = await response.json();
+      const normalized = normalizeSearchResponse(data, 'artists');
+
+      return normalized.items.map((item: any) => ({
+        id: item.id?.toString(),
+        name: item.name,
+        picture: item.picture || item.cover || getArtistPictureUrl(item.picture),
+        type: item.type
+      }));
+    } catch (error) {
+      console.warn("Artist search failed", error);
+      return [];
+    }
+  },
+
+  // Album Search
+  searchAlbums: async (query: string): Promise<any[]> => {
+    try {
+      const response = await fetchWithRetry(`/search/?al=${encodeURIComponent(query)}&limit=10`);
+      const data = await response.json();
+      const normalized = normalizeSearchResponse(data, 'albums');
+
+      return normalized.items.map((item: any) => ({
+        id: item.id?.toString(),
+        title: item.title,
+        artist: item.artist?.name || 'Unknown',
+        coverUrl: item.cover ? getCoverUrl(item.cover) : '',
+        year: item.releaseDate ? new Date(item.releaseDate).getFullYear() : undefined
+      }));
+    } catch (error) {
+      console.warn("Album search failed", error);
+      return [];
+    }
+  },
+
+  // Get Artist Details (Bio + Top Tracks + Albums)
+  getArtist: async (artistId: string) => {
+    try {
+      const [primaryResponse, contentResponse] = await Promise.all([
+        fetchWithRetry(`/artist/?id=${artistId}`),
+        fetchWithRetry(`/artist/?f=${artistId}`)
+      ]);
+
+      const primaryJson = await primaryResponse.json();
+      const primaryData = primaryJson.data || primaryJson;
+      const rawArtist = primaryData.artist || (Array.isArray(primaryData) ? primaryData[0] : primaryData);
+
+      const artist = {
+        id: rawArtist.id?.toString(),
+        name: rawArtist.name,
+        picture: getArtistPictureUrl(rawArtist.picture),
+        type: rawArtist.type
+      };
+
+      const contentJson = await contentResponse.json();
+      const contentData = contentJson.data || contentJson;
+
+      // Aggregate tracks and albums from content response (Monochrome Logic)
+      const entries = Array.isArray(contentData) ? contentData : [contentData];
+      const albumMap = new Map();
+      const trackMap = new Map();
+
+      const scan = (value: any, visited = new Set()) => {
+        if (!value || typeof value !== 'object' || visited.has(value)) return;
+        visited.add(value);
+
+        if (Array.isArray(value)) {
+          value.forEach(item => scan(item, visited));
+          return;
+        }
+
+        const item = value.item || value;
+        // Check for album
+        if (item?.id && 'numberOfTracks' in item) {
+          albumMap.set(item.id, {
+            id: item.id?.toString(),
+            title: item.title,
+            artist: item.artist?.name,
+            coverUrl: getCoverUrl(item.cover),
+            releaseDate: item.releaseDate
+          });
+        }
+        // Check for track
+        if (item?.id && item.duration && item.album) {
+          trackMap.set(item.id, mapApiTrackToTrack(item));
+        }
+
+        Object.values(value).forEach(nested => scan(nested, visited));
+      };
+
+      entries.forEach(entry => scan(entry));
+
+      const albums = Array.from(albumMap.values()).sort((a, b) =>
+        new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime()
+      );
+
+      const tracks = Array.from(trackMap.values()).slice(0, 10); // Top 10
+
+      return { artist, albums, tracks };
+
+    } catch (error) {
+      console.error("Get Artist failed", error);
+      throw error;
     }
   },
 

@@ -4,7 +4,13 @@ import { usePlayer } from '../store/PlayerContext';
 import { ZunoAPI } from '../services/zunoApi';
 import { Track, ContextType } from '../types';
 
-export const Home = () => {
+import { View } from '../types';
+
+interface HomeProps {
+  onNavigate: (view: View, id?: string) => void;
+}
+
+export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   const { playTrack } = usePlayer();
   const [context, setContext] = useState<ContextType>(ContextType.Chill);
   const [recommendations, setRecommendations] = useState<Track[]>([]);
@@ -36,9 +42,18 @@ export const Home = () => {
   const loadMoreFeed = async () => {
     setIsLoadingFeed(true);
     try {
+      // Collect all current track IDs to prevent duplicates
+      const allShownIds = new Set<string>();
+      recommendations.forEach(t => allShownIds.add(t.id));
+      feedSections.forEach(s => s.tracks.forEach(t => allShownIds.add(t.id)));
+
       // Use current length as offset
-      const newSection = await ZunoAPI.getNextFeedSection(feedSections.length);
-      setFeedSections(prev => [...prev, newSection]);
+      const newSection = await ZunoAPI.getNextFeedSection(feedSections.length, Array.from(allShownIds));
+
+      // Only add if we actually got tracks (simple validation)
+      if (newSection.tracks.length > 0) {
+        setFeedSections(prev => [...prev, newSection]);
+      }
     } catch (err) {
       console.error("Feed Error", err);
     } finally {
@@ -71,12 +86,12 @@ export const Home = () => {
     }
   };
 
-  const handleSearch = async () => {
-    if (!searchInput.trim()) return;
+  const performSearch = async (query: string) => {
+    setSearchInput(query);
     setIsAnalyzing(true);
     try {
       // Perform Hybrid Search (AI + Real Catalog)
-      const { context: detectedContext, catalogResults, similarResults, aiResults, analysis } = await ZunoAPI.searchHybrid(searchInput);
+      const { context: detectedContext, catalogResults, similarResults, aiResults, analysis } = await ZunoAPI.searchHybrid(query);
 
       setContext(detectedContext);
 
@@ -86,7 +101,7 @@ export const Home = () => {
       // Priority 1: Exact Catalog Matches
       if (catalogResults.length > 0) {
         finalTracks = [...catalogResults];
-        message = `Found ${catalogResults.length} tracks.`;
+        message = `Found ${catalogResults.length} tracks for ${query}.`;
       }
 
       // Priority 2: Smart Expansion (Similar Artists)
@@ -116,6 +131,16 @@ export const Home = () => {
     }
   };
 
+  const handleSearch = () => {
+    if (!searchInput.trim()) return;
+    performSearch(searchInput);
+  };
+
+  const handleCategoryClick = (categoryName: string) => {
+    // Direct search trigger
+    performSearch(categoryName);
+  };
+
   const CATEGORIES = [
     { name: "Music", color: "bg-gradient-to-br from-orange-400 to-orange-600", img: "🎸" },
     { name: "Live Events", color: "bg-gradient-to-br from-purple-500 to-purple-800", img: "🎤" },
@@ -134,7 +159,20 @@ export const Home = () => {
       {/* Header - Fixed & Transparent */}
       <div className="fixed top-0 left-0 right-0 z-50 px-6 py-4 md:py-6 flex items-center justify-between pointer-events-none md:ml-64">
         <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="flex flex-col items-center gap-1 group cursor-pointer">
+          <div
+            className="flex flex-col items-center gap-1 group cursor-pointer"
+            onClick={async () => {
+              // Quick Test Mode: Find Weeknd and Go there
+              try {
+                const artists = await ZunoAPI.searchArtists("The Weeknd");
+                if (artists.length > 0) {
+                  onNavigate('artist', artists[0].id);
+                } else {
+                  alert("Artist not found");
+                }
+              } catch (e) { console.error(e); }
+            }}
+          >
             <div className="w-10 h-10 rounded-full bg-white/20 p-0.5 border border-white/10 hover:border-zuno-accent transition-colors">
               <img
                 src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80"
@@ -196,10 +234,14 @@ export const Home = () => {
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               Recommended for {context}
-              <span className="text-xs bg-white/10 px-2 py-0.5 rounded-full text-white/60 font-normal border border-white/5">AI Powered</span>
             </h2>
           </div>
-          <span className="text-xs font-medium text-gray-400 hover:text-white cursor-pointer">See all</span>
+          <span
+            className="text-xs font-medium text-gray-400 hover:text-white cursor-pointer p-2 -mr-2"
+            onClick={() => alert("All Recommendations coming soon!")}
+          >
+            See all
+          </span>
         </div>
 
         <div className="flex gap-4 overflow-x-auto pb-4 pr-6 hide-scrollbar snap-x">
@@ -216,12 +258,16 @@ export const Home = () => {
                 <h3 className="text-2xl font-bold text-white mb-1 line-clamp-1">{track.title}</h3>
                 <p className="text-sm text-white/70 line-clamp-1 mb-2">{track.artist}</p>
                 <div className="flex gap-2">
-                  <span className="text-[10px] bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full text-white/90 border border-white/10">
-                    {(track.energy * 100).toFixed(0)}% Energy
-                  </span>
-                  <span className="text-[10px] bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full text-white/90 border border-white/10">
-                    {track.bpm} BPM
-                  </span>
+                  {track.energy !== undefined && !Number.isNaN(track.energy) && (
+                    <span className="text-[10px] bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full text-white/90 border border-white/10">
+                      {(track.energy * 100).toFixed(0)}% Energy
+                    </span>
+                  )}
+                  {track.bpm && (
+                    <span className="text-[10px] bg-white/20 backdrop-blur-sm px-2 py-1 rounded-full text-white/90 border border-white/10">
+                      {track.bpm} BPM
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -241,7 +287,11 @@ export const Home = () => {
         <h2 className="text-xl font-bold text-white mb-4">Recommended for today</h2>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
           {CATEGORIES.map((cat, idx) => (
-            <div key={idx} className={`relative h-24 md:h-32 rounded-2xl overflow-hidden ${cat.color} p-4 shadow-lg group cursor-pointer hover:brightness-110 transition-all`}>
+            <div
+              key={idx}
+              className={`relative h-24 md:h-32 rounded-2xl overflow-hidden ${cat.color} p-4 shadow-lg group cursor-pointer hover:brightness-110 transition-all`}
+              onClick={() => handleCategoryClick(cat.name)}
+            >
               <span className="relative z-10 text-white font-bold text-lg md:text-xl">{cat.name}</span>
               <div className="absolute -bottom-2 -right-2 text-6xl md:text-7xl opacity-30 rotate-12 group-hover:rotate-0 group-hover:scale-110 transition-transform duration-300 grayscale grayscale-0">
                 {cat.img}

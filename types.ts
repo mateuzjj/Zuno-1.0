@@ -25,12 +25,20 @@ export enum ContextType {
   Rainy = 'Rainy'
 }
 
+export interface Artist {
+  id: string;
+  name: string;
+  picture: string;
+  type?: string;
+}
+
 export interface Album {
   id: string;
   title: string;
   artist: string;
   coverUrl: string;
   year?: number;
+  releaseDate?: string;
 }
 
 export interface Playlist {
@@ -58,4 +66,4 @@ export interface PlayerState {
   isMuted: boolean;
 }
 
-export type View = 'home' | 'search' | 'library' | 'editor';
+export type View = 'home' | 'search' | 'library' | 'editor' | 'artist';
