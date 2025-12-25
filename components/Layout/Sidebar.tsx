@@ -13,7 +13,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
     { id: 'home', label: 'Início', icon: Home },
     { id: 'search', label: 'Buscar', icon: Search },
     { id: 'library', label: 'Sua Biblioteca', icon: Library },
-    { id: 'editor', label: 'Magic Studio', icon: Wand2 },
   ];
 
   return (
@@ -31,8 +30,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
             key={item.id}
             onClick={() => setView(item.id as View)}
             className={`flex items-center gap-4 text-sm font-semibold px-4 py-3 rounded-card transition-all duration-200 group ${currentView === item.id
-                ? 'bg-zuno-light text-white'
-                : 'text-zuno-muted hover:text-white hover:bg-white/5'
+              ? 'bg-zuno-light text-white'
+              : 'text-zuno-muted hover:text-white hover:bg-white/5'
               }`}
           >
             <item.icon

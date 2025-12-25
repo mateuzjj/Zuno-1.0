@@ -26,13 +26,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ currentView, setView }) =>
         <span className="text-[10px] font-medium">Buscar</span>
       </button>
 
-      <button
-        onClick={() => setView('editor')}
-        className={`flex flex-col items-center gap-1 transition-colors ${currentView === 'editor' ? 'text-white' : 'text-zuno-muted hover:text-white'}`}
-      >
-        <Wand2 size={24} strokeWidth={currentView === 'editor' ? 2.5 : 2} className={currentView === 'editor' ? "text-zuno-accent" : ""} />
-        <span className="text-[10px] font-medium">Magic</span>
-      </button>
+
 
       <button
         onClick={() => setView('library')}

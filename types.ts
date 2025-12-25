@@ -66,4 +66,4 @@ export interface PlayerState {
   isMuted: boolean;
 }
 
-export type View = 'home' | 'search' | 'library' | 'editor' | 'artist';
+export type View = 'home' | 'search' | 'library' | 'editor' | 'artist' | 'album';

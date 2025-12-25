@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, MoreVertical, Mic, Search as SearchIcon, Sparkles, Play } from 'lucide-react';
+import { Heart, MoreVertical, Mic, Search as SearchIcon, Sparkles, Play, Clock } from 'lucide-react';
 import { usePlayer } from '../store/PlayerContext';
 import { ZunoAPI } from '../services/zunoApi';
 import { Track, ContextType } from '../types';
@@ -162,13 +162,33 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           <div
             className="flex flex-col items-center gap-1 group cursor-pointer"
             onClick={async () => {
-              // Quick Test Mode: Find Weeknd and Go there
+              // Smart Personalization: Check history first
+              let searchTerms = ZunoAPI.getRecentSearches();
+              let targetArtist = "The Weeknd"; // Fallback
+
+              // Try to find a term that might be an artist (simple heuristic: > 3 chars)
+              if (searchTerms.length > 0) {
+                // Randomly pick from the top 5 recent searches to add variety
+                const recentCandidates = searchTerms.slice(0, 5).filter(t => t.length > 3);
+                if (recentCandidates.length > 0) {
+                  targetArtist = recentCandidates[Math.floor(Math.random() * recentCandidates.length)];
+                }
+              }
+
+              console.log(`Personalizing for: ${targetArtist}`);
+
               try {
-                const artists = await ZunoAPI.searchArtists("The Weeknd");
+                const artists = await ZunoAPI.searchArtists(targetArtist);
                 if (artists.length > 0) {
                   onNavigate('artist', artists[0].id);
                 } else {
-                  alert("Artist not found");
+                  // Fallback if history term yielded no artists
+                  if (targetArtist !== "The Weeknd") {
+                    const fallback = await ZunoAPI.searchArtists("The Weeknd");
+                    if (fallback.length > 0) onNavigate('artist', fallback[0].id);
+                  } else {
+                    alert("Artist not found");
+                  }
                 }
               } catch (e) { console.error(e); }
             }}
@@ -300,6 +320,34 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
           ))}
         </div>
       </div>
+
+      {/* Recent Activity / Jump Back In */}
+      {ZunoAPI.getRecentSearches().length > 0 && (
+        <div className="px-6 pb-8">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Clock size={20} className="text-zuno-accent" /> Jump Back In
+          </h2>
+          <div className="flex gap-4 overflow-x-auto pb-2 hide-scrollbar">
+            {ZunoAPI.getRecentSearches().slice(0, 6).map((term, idx) => (
+              <button
+                key={idx}
+                onClick={async () => {
+                  // Heuristic: If it looks like an artist, try to go to artist page
+                  const artists = await ZunoAPI.searchArtists(term);
+                  if (artists.length > 0) {
+                    onNavigate('artist', artists[0].id);
+                  } else {
+                    performSearch(term);
+                  }
+                }}
+                className="px-6 py-3 rounded-full bg-white/10 hover:bg-white/20 border border-white/5 backdrop-blur-md transition-colors whitespace-nowrap text-sm font-medium"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Infinite AI Feed */}
       <div className="px-6 pb-32">

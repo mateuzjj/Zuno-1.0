@@ -12,24 +12,26 @@ import { Logo } from './components/UI/Logo';
 import { View } from './types';
 
 import { ArtistPage } from './pages/Artist';
+import { AlbumPage } from './pages/Album';
 
 // Main App component that handles "routing" via state for simplicity in this SPA demo
 const ZunoApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
-  const [artistId, setArtistId] = useState<string | null>(null);
+  const [viewId, setViewId] = useState<string | null>(null);
 
   const handleNavigate = (view: View, id?: string) => {
-    if (id) setArtistId(id);
+    if (id) setViewId(id);
     setCurrentView(view);
   };
 
   const renderView = () => {
     switch (currentView) {
       case 'home': return <Home onNavigate={handleNavigate} />;
-      case 'search': return <Search />; // Likely needs nav too later
+      case 'search': return <Search onNavigate={handleNavigate} />;
       case 'library': return <Library />;
       case 'editor': return <ImageEditor />;
-      case 'artist': return artistId ? <ArtistPage artistId={artistId} /> : <div className="text-white p-8">No Artist Selected</div>;
+      case 'artist': return viewId ? <ArtistPage artistId={viewId} onNavigate={handleNavigate} /> : <div className="text-white p-8">No Artist Selected</div>;
+      case 'album': return viewId ? <AlbumPage albumId={viewId} onBack={() => setCurrentView('home')} /> : null;
       default: return <Home onNavigate={handleNavigate} />;
     }
   };
@@ -39,7 +41,7 @@ const ZunoApp: React.FC = () => {
       <Sidebar currentView={currentView} setView={setCurrentView} />
 
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-64 p-4 md:p-8 pt-6 pb-32 overflow-y-auto h-screen bg-zuno-main scroll-smooth">
+      <main className="flex-1 md:ml-64 pb-32 overflow-y-auto h-screen bg-zuno-main scroll-smooth">
 
 
         {renderView()}

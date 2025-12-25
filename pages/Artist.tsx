@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { Play, Sparkles, Clock, Disc } from 'lucide-react';
-import { ZunoAPI } from '../services/zunoApi';
+import { api } from '../services/api';
 import { Artist, Album, Track } from '../types';
 import { usePlayer } from '../store/PlayerContext';
 
+import { View } from '../types';
+
 interface ArtistPageProps {
     artistId: string;
+    onNavigate: (view: View, id?: string) => void;
 }
 
-export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId }) => {
+export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) => {
     const { playTrack } = usePlayer();
     const [artist, setArtist] = useState<Artist | null>(null);
     const [albums, setAlbums] = useState<Album[]>([]);
@@ -19,7 +22,7 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId }) => {
         const loadData = async () => {
             setLoading(true);
             try {
-                const data = await ZunoAPI.getArtist(artistId);
+                const data = await api.getArtist(artistId);
                 setArtist(data.artist);
                 setAlbums(data.albums);
                 setTopTracks(data.tracks);
@@ -114,7 +117,7 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId }) => {
 
                     <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                         {albums.map(album => (
-                            <div key={album.id} className="group cursor-pointer">
+                            <div key={album.id} className="group cursor-pointer" onClick={() => onNavigate('album', album.id)}>
                                 <div className="relative aspect-square rounded-2xl overflow-hidden mb-3 shadow-lg shadow-black/30">
                                     <img src={album.coverUrl} alt={album.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
                                     <div className="absolute inset-0 bg-black/20 group-hover:bg-transparent transition-colors" />

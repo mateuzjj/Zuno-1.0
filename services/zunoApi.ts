@@ -234,5 +234,6 @@ export const ZunoAPI = {
 
     // New Search Passthroughs
     searchArtists: (query: string) => api.searchArtists(query),
-    getArtist: (id: string) => api.getArtist(id)
+    getArtist: (id: string) => api.getArtist(id),
+    getAlbum: (id: string) => api.getAlbum(id)
 };
