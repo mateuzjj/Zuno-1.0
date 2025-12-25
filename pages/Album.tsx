@@ -73,7 +73,7 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                         <div className="flex items-center gap-2 text-gray-300 font-medium text-lg">
                             <span>{album.artist}</span>
                             <span className="w-1 h-1 bg-gray-400 rounded-full" />
-                            <span className="flex items-center gap-1"><Calendar size={16} /> {album.year || new Date(album.releaseDate || '').getFullYear()}</span>
+                            <span className="flex items-center gap-1"><Calendar size={16} /> {album.year || (album.releaseDate ? new Date(album.releaseDate).getFullYear() : 'Unknown')}</span>
                         </div>
                     </div>
 
@@ -107,6 +107,6 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                     ))}
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
