@@ -143,12 +143,14 @@ function getCoverUrl(id: string | undefined, size = '640'): string {
 }
 
 // Mapper: Converts Raw API Track to ZUNO Track
-function mapApiTrackToTrack(item: any): Track {
+function mapApiTrackToTrack(item: any, fallbackArtistName?: string): Track {
   const albumCover = item.album?.cover || item.cover || '';
+  const artistName = item.artist?.name || fallbackArtistName || 'Unknown Artist';
+
   return {
     id: item.id?.toString(),
     title: item.title,
-    artist: item.artist?.name || 'Unknown Artist',
+    artist: artistName,
     album: item.album?.title || 'Unknown Album',
     coverUrl: getCoverUrl(albumCover, '320'),
     duration: item.duration,
@@ -323,7 +325,13 @@ export const api = {
         new Date(b.releaseDate || 0).getTime() - new Date(a.releaseDate || 0).getTime()
       );
 
-      const tracks = Array.from(trackMap.values()).slice(0, 10); // Top 10
+      // Pass artist name to track mapper
+      const tracks = Array.from(trackMap.values())
+        .map(track => ({
+          ...track,
+          artist: artist.name || track.artist // Ensure artist name is correct
+        }))
+        .slice(0, 10); // Top 10
 
       return { artist, albums, tracks };
 

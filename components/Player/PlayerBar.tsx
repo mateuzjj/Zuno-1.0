@@ -1,12 +1,12 @@
 import React from 'react';
 import { usePlayer } from '../../store/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download, Shuffle, Repeat, Repeat1 } from 'lucide-react';
 import { DownloadService } from '../../services/download';
 import { toast } from '../UI/Toast';
 import { PlayerStatus } from '../../types';
 
 export const PlayerBar: React.FC = () => {
-  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded } = usePlayer();
+  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode } = usePlayer();
 
   if (!currentTrack) return null;
 
@@ -58,7 +58,14 @@ export const PlayerBar: React.FC = () => {
 
         {/* Controls & Scrubber */}
         <div className="flex flex-col items-center flex-1 max-w-2xl">
-          <div className="flex items-center gap-6 mb-1">
+          <div className="flex items-center gap-4 md:gap-6 mb-1">
+            <button
+              onClick={toggleShuffle}
+              className={`transition-colors hover:scale-110 ${shuffleEnabled ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
+              title={shuffleEnabled ? 'Shuffle On' : 'Shuffle Off'}
+            >
+              <Shuffle size={18} />
+            </button>
             <button onClick={prevTrack} className="text-zuno-muted hover:text-white transition-colors hover:scale-110">
               <SkipBack size={20} />
             </button>
@@ -70,6 +77,13 @@ export const PlayerBar: React.FC = () => {
             </button>
             <button onClick={nextTrack} className="text-zuno-muted hover:text-white transition-colors hover:scale-110">
               <SkipForward size={20} />
+            </button>
+            <button
+              onClick={cycleRepeatMode}
+              className={`transition-colors hover:scale-110 ${repeatMode !== 'off' ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
+              title={`Repeat: ${repeatMode}`}
+            >
+              {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
             </button>
           </div>
 

@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Play, Sparkles, Clock, Disc } from 'lucide-react';
+import { Play, Sparkles, Clock, Disc, UserPlus, UserCheck } from 'lucide-react';
 import { api } from '../services/api';
 import { Artist, Album, Track } from '../types';
 import { usePlayer } from '../store/PlayerContext';
+import { FollowService } from '../services/followService';
+import { toast } from '../components/UI/Toast';
 
 import { View } from '../types';
 
@@ -16,6 +18,7 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
     const [artist, setArtist] = useState<Artist | null>(null);
     const [albums, setAlbums] = useState<Album[]>([]);
     const [topTracks, setTopTracks] = useState<Track[]>([]);
+    const [isFollowing, setIsFollowing] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -34,7 +37,33 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
         };
 
         if (artistId) loadData();
+        checkFollowStatus();
     }, [artistId]);
+
+    const checkFollowStatus = async () => {
+        if (!artistId) return;
+        const following = await FollowService.isFollowingArtist(artistId);
+        setIsFollowing(following);
+    };
+
+    const toggleFollow = async () => {
+        if (!artist) return;
+
+        try {
+            if (isFollowing) {
+                await FollowService.unfollowArtist(artist.id);
+                setIsFollowing(false);
+                toast.show(`Você deixou de seguir ${artist.name}`, 'info');
+            } else {
+                await FollowService.followArtist(artist);
+                setIsFollowing(true);
+                toast.show(`Agora você está seguindo ${artist.name}`, 'success');
+            }
+        } catch (error) {
+            console.error('Failed to toggle follow:', error);
+            toast.show('Erro ao atualizar status de seguidor', 'error');
+        }
+    };
 
     if (loading) {
         return (
@@ -62,10 +91,29 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
                     <h1 className="text-5xl md:text-7xl font-bold mb-4 drop-shadow-2xl">{artist.name}</h1>
                     <div className="flex gap-4">
                         <button
-                            onClick={() => topTracks.length > 0 && playTrack(topTracks[0])}
+                            onClick={() => topTracks.length > 0 && playTrack(topTracks[0], topTracks)}
                             className="bg-zuno-accent text-black px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform"
                         >
                             <Play fill="currentColor" size={20} /> Play
+                        </button>
+                        <button
+                            onClick={toggleFollow}
+                            className={`px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-all ${isFollowing
+                                    ? 'bg-white/10 text-white border border-white/20'
+                                    : 'bg-white text-black'
+                                }`}
+                        >
+                            {isFollowing ? (
+                                <>
+                                    <UserCheck size={20} />
+                                    Seguindo
+                                </>
+                            ) : (
+                                <>
+                                    <UserPlus size={20} />
+                                    Seguir
+                                </>
+                            )}
                         </button>
                         {artist.type === 'MAIN' && (
                             <span className="px-4 py-2 bg-white/10 backdrop-blur rounded-full text-sm font-medium border border-white/10">
@@ -87,7 +135,7 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
                         {topTracks.map((track, idx) => (
                             <div
                                 key={track.id}
-                                onClick={() => playTrack(track)}
+                                onClick={() => playTrack(track, topTracks)}
                                 className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 group cursor-pointer transition-colors"
                             >
                                 <span className="text-gray-500 w-6 text-center font-mono">{idx + 1}</span>

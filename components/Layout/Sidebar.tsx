@@ -58,7 +58,10 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
           </div>
           Criar playlist
         </button>
-        <button className="flex items-center gap-4 text-sm font-semibold text-zuno-muted hover:text-white transition-colors group">
+        <button
+          onClick={() => setView('likedSongs')}
+          className="flex items-center gap-4 text-sm font-semibold text-zuno-muted hover:text-white transition-colors group"
+        >
           <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity shadow-lg shadow-purple-900/20">
             <Heart size={16} fill="white" className="text-white" />
           </div>

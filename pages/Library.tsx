@@ -1,91 +1,170 @@
-import React, { useState } from 'react';
-import { Heart, Music, Plus, Play, Disc } from 'lucide-react';
-import { usePlayer } from '../store/PlayerContext';
-// import { ZunoAPI } from '../services/zunoApi'; // We might use this later for real data
+import React, { useState, useEffect } from 'react';
+import { Heart, Music, Plus, Play, Download } from 'lucide-react';
+import { Playlist } from '../types';
+import { PlaylistService } from '../services/playlistService';
+import { CreatePlaylistModal } from '../components/UI/CreatePlaylistModal';
+import { SpotifyImportModal } from '../components/UI/SpotifyImportModal';
+import { View } from '../types';
 
-export const Library: React.FC = () => {
-  // Mock data for initial view
-  const playlists = [
-    { id: '1', name: 'My Top 50', count: 50, cover: 'https://images.unsplash.com/photo-1493225255756-d9584f8606e9?w=300&q=80' },
-    { id: '2', name: 'Chill Vibes', count: 124, cover: 'https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=300&q=80' },
-    { id: '3', name: 'Gym Motivation', count: 45, cover: 'https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&q=80' },
-  ];
+interface LibraryProps {
+  onNavigate: (view: View, id?: string) => void;
+}
 
-  const likedTracks = [
-    { id: 'l1', title: 'Starboy', artist: 'The Weeknd', date: '2 days ago' },
-    { id: 'l2', title: 'Midnight City', artist: 'M83', date: '1 week ago' },
-    { id: 'l3', title: 'Heat Waves', artist: 'Glass Animals', date: '2 weeks ago' },
-  ];
+export const Library: React.FC<LibraryProps> = ({ onNavigate }) => {
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isSpotifyImportOpen, setIsSpotifyImportOpen] = useState(false);
+
+  useEffect(() => {
+    loadPlaylists();
+  }, []);
+
+  const loadPlaylists = async () => {
+    setLoading(true);
+    try {
+      const pls = await PlaylistService.getPlaylists();
+      setPlaylists(pls.reverse()); // Most recent first
+    } catch (error) {
+      console.error('Failed to load playlists:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePlaylistCreated = () => {
+    loadPlaylists();
+  };
 
   return (
     <div className="p-8 pb-32 min-h-screen bg-gradient-to-b from-zuno-main to-black">
-      {/* Header */}
-      <div className="flex items-end gap-6 mb-8">
-        <div className="w-52 h-52 bg-gradient-to-br from-indigo-500 to-purple-600 shadow-2xl shadow-purple-900/40 rounded-lg flex items-center justify-center">
-          <Heart size={80} className="text-white fill-white/20" />
+      {/* Header Section */}
+      <div className="mb-12">
+        <h1 className="text-5xl md:text-7xl font-black text-white tracking-tight mb-2">
+          Sua Biblioteca
+        </h1>
+        <p className="text-zuno-muted">Suas playlists e músicas curtidas</p>
+      </div>
+
+      {/* Quick Access Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-12">
+        {/* Liked Songs Card */}
+        <div
+          onClick={() => onNavigate('likedSongs')}
+          className="flex items-center gap-4 bg-gradient-to-br from-purple-600 to-pink-600 p-4 rounded-lg cursor-pointer hover:from-purple-500 hover:to-pink-500 transition-all group"
+        >
+          <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
+            <Heart size={32} className="text-white" fill="currentColor" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Músicas Curtidas</h3>
+            <p className="text-sm text-white/80">Todas as suas favoritas</p>
+          </div>
         </div>
-        <div className="mb-2">
-          <p className="text-sm font-bold uppercase tracking-widest text-white mb-1">Playlist</p>
-          <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter mb-4">Músicas Curtidas</h1>
-          <div className="flex items-center gap-2 text-sm text-zuno-muted font-medium">
-            <span className="text-white">Mateus</span>
-            <span>•</span>
-            <span>328 músicas</span>
+
+        {/* Spotify Import Card */}
+        <div
+          onClick={() => setIsSpotifyImportOpen(true)}
+          className="flex items-center gap-4 bg-gradient-to-br from-green-600 to-green-500 p-4 rounded-lg cursor-pointer hover:from-green-500 hover:to-green-400 transition-all group"
+        >
+          <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
+            <Download size={32} className="text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Importar do Spotify</h3>
+            <p className="text-sm text-white/80">Migre suas músicas favoritas</p>
           </div>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center gap-6 mb-8">
-        <button className="w-14 h-14 rounded-full bg-zuno-accent flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-green-900/40 text-black">
-          <Play size={24} fill="currentColor" className="ml-1" />
-        </button>
-      </div>
+      {/* Playlists Section */}
+      <section>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-3xl font-bold text-white">Suas Playlists</h2>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-zuno-accent text-black font-semibold rounded-full hover:bg-zuno-accent/90 hover:scale-105 transition-all"
+          >
+            <Plus size={20} />
+            <span>Nova Playlist</span>
+          </button>
+        </div>
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Playlists Section */}
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold text-white">Seus Playlists</h2>
-            <button className="p-2 bg-white/5 rounded-full hover:bg-white/10 text-white transition-colors">
-              <Plus size={20} />
-            </button>
+        {loading ? (
+          <div className="text-center py-16">
+            <p className="text-zuno-muted">Carregando playlists...</p>
           </div>
+        ) : playlists.length === 0 ? (
+          <div className="text-center py-16">
+            <Music size={64} className="text-zuno-muted mx-auto mb-4" />
+            <h3 className="text-2xl font-bold text-white mb-2">Nenhuma playlist ainda</h3>
+            <p className="text-zuno-muted mb-6">Crie sua primeira playlist ou import do Spotify</p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={() => setIsCreateModalOpen(true)}
+                className="px-6 py-3 bg-zuno-accent text-black font-semibold rounded-full hover:bg-zuno-accent/90 transition-all"
+              >
+                Criar Playlist
+              </button>
+              <button
+                onClick={() => setIsSpotifyImportOpen(true)}
+                className="px-6 py-3 bg-green-600 text-white font-semibold rounded-full hover:bg-green-700 transition-all"
+              >
+                Importar do Spotify
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+            {playlists.map((pl) => (
+              <div
+                key={pl.id}
+                onClick={() => onNavigate('playlist', pl.id)}
+                className="bg-zuno-card p-4 rounded-card hover:bg-white/5 transition-all group cursor-pointer transform hover:scale-105"
+              >
+                <div className="relative aspect-square mb-4 rounded-lg overflow-hidden shadow-lg bg-gradient-to-br from-blue-500 to-purple-500">
+                  {pl.coverUrl ? (
+                    <img
+                      src={pl.coverUrl}
+                      alt={pl.name}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Music size={48} className="text-white/50" />
+                    </div>
+                  )}
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {playlists.map(pl => (
-              <div key={pl.id} className="bg-zuno-card p-4 rounded-card hover:bg-white/5 transition-colors group cursor-pointer">
-                <div className="relative aspect-square mb-4 rounded-lg overflow-hidden shadow-lg">
-                  <img src={pl.cover} alt={pl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  {/* Play Button Overlay */}
+                  <div className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="w-12 h-12 bg-zuno-accent rounded-full flex items-center justify-center shadow-lg">
+                      <Play size={20} fill="currentColor" className="text-black ml-0.5" />
+                    </div>
+                  </div>
                 </div>
-                <h3 className="font-bold text-white truncate">{pl.name}</h3>
-                <p className="text-sm text-zuno-muted">By You</p>
+                <h3 className="font-bold text-white truncate mb-1">{pl.name}</h3>
+                <p className="text-sm text-zuno-muted">
+                  {pl.tracks.length} {pl.tracks.length === 1 ? 'música' : 'músicas'}
+                </p>
               </div>
             ))}
           </div>
-        </section>
+        )}
+      </section>
 
-        {/* Liked / Recent Section (Simple List) */}
-        <section>
-          <h2 className="text-2xl font-bold text-white mb-4">Adicionadas Recentemente</h2>
-          <div className="flex flex-col">
-            {likedTracks.map((track, i) => (
-              <div key={track.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group transition-colors cursor-pointer">
-                <span className="text-zuno-muted w-4 text-center group-hover:text-white">{i + 1}</span>
-                <div className="flex-1">
-                  <h4 className="text-white font-medium group-hover:text-zuno-accent transition-colors">{track.title}</h4>
-                  <p className="text-sm text-zuno-muted">{track.artist}</p>
-                </div>
-                <span className="text-sm text-zuno-muted">{track.date}</span>
-                <div className="opacity-0 group-hover:opacity-100 text-zuno-accent">
-                  <Heart size={16} fill="currentColor" />
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
+      {/* Modals */}
+      <CreatePlaylistModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreated={handlePlaylistCreated}
+      />
+      <SpotifyImportModal
+        isOpen={isSpotifyImportOpen}
+        onClose={() => {
+          setIsSpotifyImportOpen(false);
+          loadPlaylists();
+        }}
+      />
     </div>
   );
 };
