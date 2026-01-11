@@ -1,12 +1,12 @@
 import React from 'react';
 import { usePlayer } from '../../store/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download, Shuffle, Repeat, Repeat1 } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download, Shuffle, Repeat, Repeat1, Heart } from 'lucide-react';
 import { DownloadService } from '../../services/download';
 import { toast } from '../UI/Toast';
 import { PlayerStatus } from '../../types';
 
 export const PlayerBar: React.FC = () => {
-  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode } = usePlayer();
+  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode, isLiked, toggleLike } = usePlayer();
 
   if (!currentTrack) return null;
 
@@ -23,37 +23,45 @@ export const PlayerBar: React.FC = () => {
   const isPlaying = status === PlayerStatus.PLAYING;
 
   return (
-    <div className="fixed bottom-[64px] md:bottom-6 left-2 right-2 md:left-8 md:right-8 bg-zuno-card/95 border border-white/5 p-3 md:p-4 z-50 rounded-2xl md:rounded-3xl backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300">
+    <div className="fixed bottom-[64px] md:bottom-6 left-2 right-2 md:left-8 md:right-8 bg-zuno-card/95 border border-white/5 p-3 md:p-4 z-50 rounded-2xl md:rounded-3xl backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 safe-left safe-right" style={{ bottom: 'calc(64px + env(safe-area-inset-bottom))' }}>
       <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
 
         {/* Track Info */}
-        <div
-          className="flex items-center gap-4 w-1/3 min-w-[120px] cursor-pointer group"
-          onClick={toggleExpanded}
-        >
-          <div className="relative">
-            <img
-              src={currentTrack.coverUrl}
-              alt={currentTrack.title}
-              className="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-zuno-dark object-cover shadow-lg group-hover:scale-105 transition-transform duration-300"
-            />
-            <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-              <Maximize2 size={20} className="text-white" />
+        <div className="flex items-center gap-4 w-1/3 min-w-[120px]">
+          <div
+            className="flex items-center gap-4 cursor-pointer group"
+            onClick={toggleExpanded}
+          >
+            <div className="relative">
+              <img
+                src={currentTrack.coverUrl}
+                alt={currentTrack.title}
+                className="w-12 h-12 md:w-16 md:h-16 rounded-xl bg-zuno-dark object-cover shadow-lg group-hover:scale-105 transition-transform duration-300"
+              />
+              <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Maximize2 size={20} className="text-white" />
+              </div>
+            </div>
+            <div className="hidden md:block overflow-hidden">
+              <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
+                {currentTrack.title}
+              </h4>
+              <p className="text-xs text-zuno-muted truncate hover:text-white cursor-pointer transition-colors">
+                {currentTrack.artist}
+              </p>
             </div>
           </div>
-          <div className="hidden md:block overflow-hidden">
-            <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
-              {currentTrack.title}
-            </h4>
-            <p className="text-xs text-zuno-muted truncate hover:text-white cursor-pointer transition-colors">
-              {currentTrack.artist}
-            </p>
-          </div>
-          {/* Mobile Text */}
-          <div className="block md:hidden overflow-hidden flex-1">
-            <h4 className="text-xs font-bold text-white truncate">{currentTrack.title}</h4>
-            <p className="text-[10px] text-zuno-muted truncate">{currentTrack.artist}</p>
-          </div>
+
+          {/* Like Button */}
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLike();
+            }}
+            className={`transition-colors hover:scale-110 ${isLiked ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
+          >
+            <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+          </button>
         </div>
 
         {/* Controls & Scrubber */}
@@ -96,11 +104,13 @@ export const PlayerBar: React.FC = () => {
                 max={currentTrack.duration}
                 value={currentTime}
                 onChange={handleSeek}
-                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-zuno-accent transition-all"
+                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-zuno-accent transition-all touch-none"
                 style={{
                   background: `linear-gradient(to right, #1ED760 ${(currentTime / currentTrack.duration) * 100
                     }%, #333 ${(currentTime / currentTrack.duration) * 100
                     }%)`,
+                  WebkitAppearance: 'none',
+                  touchAction: 'none',
                 }}
               />
             </div>
@@ -134,11 +144,13 @@ export const PlayerBar: React.FC = () => {
               step={0.01}
               value={isMuted ? 0 : volume}
               onChange={(e) => setVolume(Number(e.target.value))}
-              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white"
+              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white touch-none"
               style={{
                 background: `linear-gradient(to right, #ffffff ${volume * 100
                   }%, #333 ${volume * 100
                   }%)`,
+                WebkitAppearance: 'none',
+                touchAction: 'none',
               }}
             />
           </div>

@@ -76,7 +76,7 @@ export async function matchTrack(spotifyTrack: SpotifyTrack): Promise<Track | nu
         const results = await api.search(searchQuery);
 
         if (results.length === 0) {
-            console.log(`[SpotifyMatcher] No results found for "${searchQuery}"`);
+            console.warn(`[SpotifyMatcher] No results found for "${searchQuery}"`);
             return null;
         }
 
@@ -105,17 +105,26 @@ export async function matchTrack(spotifyTrack: SpotifyTrack): Promise<Track | nu
 
         const best = scored[0];
 
-        console.log(`[SpotifyMatcher] Best match: "${best.track.title}" by ${best.track.artist} (score: ${best.score.toFixed(2)})`);
+        // Detailed log for debugging matches
+        console.debug(`[SpotifyMatcher] Matching "${trackName}" by ${artistName}:`, {
+            bestMatch: `${best.track.title} by ${best.track.artist}`,
+            score: best.score.toFixed(2),
+            details: {
+                titleSim: best.titleSimilarity.toFixed(2),
+                artistSim: best.artistSimilarity.toFixed(2),
+                durationMatch: best.durationMatch.toFixed(2)
+            }
+        });
 
         // Threshold: require at least 0.7 similarity
         if (best.score >= 0.7) {
             return best.track;
         }
 
-        console.log(`[SpotifyMatcher] Best match score too low (${best.score.toFixed(2)} < 0.7)`);
+        console.warn(`[SpotifyMatcher] Best match score too low (${best.score.toFixed(2)} < 0.7) for "${trackName}"`);
         return null;
     } catch (error) {
-        console.error('[SpotifyMatcher] Match failed:', error);
+        console.error('[SpotifyMatcher] Match failed for track:', spotifyTrack.name, error);
         return null;
     }
 }

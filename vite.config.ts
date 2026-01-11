@@ -18,6 +18,23 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        // Otimizações para mobile/iOS
+        target: 'es2015',
+        minify: 'terser',
+        terserOptions: {
+          compress: {
+            drop_console: mode === 'production',
+          },
+        },
+        rollupOptions: {
+          output: {
+            manualChunks: {
+              'react-vendor': ['react', 'react-dom'],
+            },
+          },
+        },
+      },
     };
 });

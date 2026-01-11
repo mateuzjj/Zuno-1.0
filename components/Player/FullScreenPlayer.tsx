@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { usePlayer } from '../../store/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, ChevronDown, Shuffle, Repeat, Volume2, VolumeX, Download, Music2, FileText } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, ChevronDown, Shuffle, Repeat, Volume2, VolumeX, Download, Music2, FileText, Heart } from 'lucide-react';
 import { DownloadService } from '../../services/download';
 import { toast } from '../UI/Toast';
 import { LyricsPanel } from './LyricsPanel';
@@ -25,6 +25,8 @@ export const FullScreenPlayer: React.FC = () => {
         cycleRepeatMode,
         currentLyrics,
         lyricsLoading,
+        isLiked,
+        toggleLike,
     } = usePlayer();
 
     const [showLyrics, setShowLyrics] = useState(false);
@@ -138,7 +140,7 @@ export const FullScreenPlayer: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-gradient-to-b from-black via-zuno-dark to-black backdrop-blur-3xl flex flex-col animate-in slide-in-from-bottom duration-500 h-[100dvh] overflow-hidden">
+        <div className="fixed inset-0 z-[60] bg-gradient-to-b from-black via-zuno-dark to-black backdrop-blur-3xl flex flex-col animate-in slide-in-from-bottom duration-500 h-[100dvh] overflow-hidden" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
 
             {/* Background Ambience */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -255,9 +257,19 @@ export const FullScreenPlayer: React.FC = () => {
                     </div>
 
                     {/* Track Info */}
-                    <div className="mt-4 md:mt-16 text-center space-y-1 md:space-y-2 shrink-0">
-                        <h2 className="text-xl md:text-3xl font-bold text-white tracking-tight line-clamp-1 px-4">{currentTrack.title}</h2>
-                        <p className="text-base md:text-lg text-zuno-muted font-medium">{currentTrack.artist}</p>
+                    <div className="mt-4 md:mt-16 text-center space-y-1 md:space-y-2 shrink-0 flex flex-col items-center">
+                        <div className="flex items-center gap-4">
+                            <div className="text-center">
+                                <h2 className="text-xl md:text-3xl font-bold text-white tracking-tight line-clamp-1 px-4">{currentTrack.title}</h2>
+                                <p className="text-base md:text-lg text-zuno-muted font-medium">{currentTrack.artist}</p>
+                            </div>
+                            <button
+                                onClick={toggleLike}
+                                className={`transition-colors hover:scale-110 p-2 ${isLiked ? 'text-zuno-accent' : 'text-white/40 hover:text-white'}`}
+                            >
+                                <Heart size={24} fill={isLiked ? "currentColor" : "none"} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -295,7 +307,11 @@ export const FullScreenPlayer: React.FC = () => {
                                 max={duration || 100}
                                 value={currentTime}
                                 onChange={handleSeek}
-                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 touch-none"
+                                style={{
+                                  WebkitAppearance: 'none',
+                                  touchAction: 'none',
+                                }}
                             />
                         </div>
 

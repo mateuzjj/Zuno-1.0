@@ -17,7 +17,10 @@ interface PlayerContextType extends PlayerState {
   prevTrack: () => void;
   toggleExpanded: () => void;
   toggleShuffle: () => void;
+  toggleShuffle: () => void;
   cycleRepeatMode: () => void;
+  isLiked: boolean;
+  toggleLike: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -175,6 +178,37 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     loadLyrics();
   }, [currentTrack]);
 
+  // Liked Status Logic
+  const [isLiked, setIsLiked] = useState(false);
+
+  useEffect(() => {
+    if (!currentTrack) {
+      setIsLiked(false);
+      return;
+    }
+
+    // Check if track is already liked
+    import('../services/likedSongsService').then(({ LikedSongsService }) => {
+      LikedSongsService.isTrackLiked(currentTrack.id).then(liked => {
+        setIsLiked(liked);
+      });
+    });
+  }, [currentTrack]);
+
+  const toggleLike = async () => {
+    if (!currentTrack) return;
+
+    const { LikedSongsService } = await import('../services/likedSongsService');
+
+    if (isLiked) {
+      await LikedSongsService.unlikeTrack(currentTrack.id);
+      setIsLiked(false);
+    } else {
+      await LikedSongsService.likeTrack(currentTrack);
+      setIsLiked(true);
+    }
+  };
+
   // Helper to actually load and play a track
   const playTrackInternal = async (track: Track) => {
     if (!audioRef.current) return;
@@ -304,9 +338,26 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const nextTrack = () => {
     if (queue.length === 0) return;
 
-    const nextIdx = (currentIndex + 1) % queue.length;
-    const nextTrk = queue[nextIdx];
+    // Check if we're at the end of the queue
+    const isAtEnd = currentIndex >= queue.length - 1;
 
+    // Determine next index based on repeat mode
+    let nextIdx: number;
+    if (isAtEnd) {
+      // At end of queue
+      if (repeatMode === 'off') {
+        // Don't advance if repeat is off and we're at the end
+        return;
+      } else {
+        // Wrap around to start if repeat is 'all' or 'one'
+        nextIdx = 0;
+      }
+    } else {
+      // Not at end, just go to next track
+      nextIdx = currentIndex + 1;
+    }
+
+    const nextTrk = queue[nextIdx];
     if (nextTrk) {
       setCurrentIndex(nextIdx);
       playTrackInternal(nextTrk);
@@ -322,13 +373,27 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return;
     }
 
-    const prevIdx = currentIndex - 1;
-    if (prevIdx >= 0) {
-      const prevTrk = queue[prevIdx];
-      if (prevTrk) {
-        setCurrentIndex(prevIdx);
-        playTrackInternal(prevTrk);
+    // Determine previous index with wrap-around support
+    let prevIdx: number;
+    if (currentIndex === 0) {
+      // At start of queue
+      if (repeatMode === 'off') {
+        // Don't go back if repeat is off and we're at the start
+        seek(0); // Just restart current track
+        return;
+      } else {
+        // Wrap around to last track if repeat is enabled
+        prevIdx = queue.length - 1;
       }
+    } else {
+      // Not at start, just go to previous track
+      prevIdx = currentIndex - 1;
+    }
+
+    const prevTrk = queue[prevIdx];
+    if (prevTrk) {
+      setCurrentIndex(prevIdx);
+      playTrackInternal(prevTrk);
     }
   };
 
@@ -355,7 +420,11 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       prevTrack,
       toggleExpanded,
       toggleShuffle,
-      cycleRepeatMode
+      toggleExpanded,
+      toggleShuffle,
+      cycleRepeatMode,
+      isLiked,
+      toggleLike
     }}>
       {children}
     </PlayerContext.Provider>

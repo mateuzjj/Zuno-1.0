@@ -71,7 +71,7 @@ export interface PlayerState {
   repeatMode: RepeatMode;
 }
 
-export type View = 'home' | 'search' | 'library' | 'editor' | 'artist' | 'album' | 'playlist' | 'likedSongs';
+export type View = 'home' | 'search' | 'library' | 'editor' | 'artist' | 'album' | 'playlist' | 'likedSongs' | 'generator';
 
 // Lyrics Types
 export interface LyricsLine {

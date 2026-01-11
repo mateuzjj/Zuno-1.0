@@ -17,6 +17,7 @@ import { ArtistPage } from './pages/Artist';
 import { AlbumPage } from './pages/Album';
 import { ToastContainer, toast } from './components/UI/Toast';
 import { SpotifyAuth } from './services/spotifyAuth';
+import { Generator } from './components/Recommendation/Generator';
 
 // Main App component that handles "routing" via state for simplicity in this SPA demo
 const ZunoApp: React.FC = () => {
@@ -72,6 +73,7 @@ const ZunoApp: React.FC = () => {
       case 'editor': return <ImageEditor />;
       case 'artist': return viewId ? <ArtistPage artistId={viewId} onNavigate={handleNavigate} /> : <div className="text-white p-8">No Artist Selected</div>;
       case 'album': return viewId ? <AlbumPage albumId={viewId} onBack={() => setCurrentView('home')} /> : null;
+      case 'generator': return <Generator />;
       default: return <Home onNavigate={handleNavigate} />;
     }
   };
@@ -91,7 +93,7 @@ const ZunoApp: React.FC = () => {
           <Sidebar currentView={currentView} setView={setCurrentView} />
 
           {/* Main Content Area */}
-          <main className="flex-1 md:ml-64 pb-32 overflow-y-auto h-screen bg-zuno-main scroll-smooth">
+          <main className="flex-1 md:ml-64 pb-32 overflow-y-auto h-screen bg-zuno-main scroll-smooth safe-top" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8rem)' }}>
 
 
             {renderView()}

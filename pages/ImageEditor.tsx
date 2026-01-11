@@ -1,6 +1,11 @@
 import React, { useState, useRef } from 'react';
 import { Upload, Sparkles, Wand2, Download, ArrowRight } from 'lucide-react';
-import { editImage } from '../services/gemini.ts';
+
+// Image editing feature disabled (requires external AI service)
+const editImage = async (image: string, prompt: string): Promise<string | null> => {
+  console.warn('Image editing feature is disabled');
+  return null;
+};
 
 export const ImageEditor: React.FC = () => {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
@@ -45,12 +50,8 @@ export const ImageEditor: React.FC = () => {
 
     setIsLoading(true);
     try {
-      const result = await editImage(originalImage, prompt);
-      if (result) {
-        setGeneratedImage(result);
-      } else {
-        alert("Não foi possível gerar a imagem. Tente um prompt diferente.");
-      }
+      alert("Recurso de edição de imagem desabilitado. Configure uma API de IA para usar esta funcionalidade.");
+      setIsLoading(false);
     } catch (error) {
       console.error(error);
       alert("Erro ao conectar com a mágica. Verifique sua conexão ou API Key.");
@@ -85,13 +86,13 @@ export const ImageEditor: React.FC = () => {
 
       {/* Editor Area */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        
+
         {/* Upload / Original Section */}
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-zuno-muted uppercase tracking-wider">Original</h3>
-          
+
           {!originalImage ? (
-            <div 
+            <div
               onClick={() => fileInputRef.current?.click()}
               onDragOver={handleDragOver}
               onDrop={handleDrop}
@@ -104,18 +105,18 @@ export const ImageEditor: React.FC = () => {
                 <p className="text-white font-medium">Clique ou arraste</p>
                 <p className="text-xs text-zuno-muted mt-1">JPG, PNG (max 5MB)</p>
               </div>
-              <input 
-                type="file" 
-                ref={fileInputRef} 
-                onChange={handleFileChange} 
-                className="hidden" 
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileChange}
+                className="hidden"
                 accept="image/*"
               />
             </div>
           ) : (
             <div className="relative group aspect-square rounded-xl overflow-hidden bg-zuno-black border border-white/10">
               <img src={originalImage} alt="Original" className="w-full h-full object-cover" />
-              <button 
+              <button
                 onClick={() => setOriginalImage(null)}
                 className="absolute top-2 right-2 bg-black/60 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-black"
               >
@@ -127,71 +128,70 @@ export const ImageEditor: React.FC = () => {
 
         {/* Controls & Result Section */}
         <div className="space-y-4 flex flex-col h-full">
-           <h3 className="text-sm font-semibold text-zuno-muted uppercase tracking-wider">
-             {generatedImage ? 'Resultado' : 'Sua Criação'}
-           </h3>
+          <h3 className="text-sm font-semibold text-zuno-muted uppercase tracking-wider">
+            {generatedImage ? 'Resultado' : 'Sua Criação'}
+          </h3>
 
-           {generatedImage ? (
-             <div className="relative aspect-square rounded-xl overflow-hidden bg-zuno-black border border-white/10 group">
-                <img src={generatedImage} alt="Generated" className="w-full h-full object-cover animate-in fade-in zoom-in duration-500" />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
-                   <button 
-                    onClick={handleDownload}
-                    className="bg-zuno-accent text-zuno-black px-6 py-2 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform"
-                   >
-                     <Download size={18} /> Baixar
-                   </button>
-                   <button 
-                    onClick={() => setGeneratedImage(null)}
-                    className="bg-white text-black px-6 py-2 rounded-full font-bold hover:scale-105 transition-transform"
-                   >
-                     Novo
-                   </button>
+          {generatedImage ? (
+            <div className="relative aspect-square rounded-xl overflow-hidden bg-zuno-black border border-white/10 group">
+              <img src={generatedImage} alt="Generated" className="w-full h-full object-cover animate-in fade-in zoom-in duration-500" />
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
+                <button
+                  onClick={handleDownload}
+                  className="bg-zuno-accent text-zuno-black px-6 py-2 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform"
+                >
+                  <Download size={18} /> Baixar
+                </button>
+                <button
+                  onClick={() => setGeneratedImage(null)}
+                  className="bg-white text-black px-6 py-2 rounded-full font-bold hover:scale-105 transition-transform"
+                >
+                  Novo
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col justify-center gap-6 p-6 rounded-xl bg-gradient-to-br from-zuno-dark/40 to-transparent border border-white/5">
+              {!originalImage ? (
+                <div className="text-center text-zuno-muted opacity-50">
+                  <Wand2 size={48} className="mx-auto mb-4" />
+                  <p>Faça upload de uma imagem para começar a mágica.</p>
                 </div>
-             </div>
-           ) : (
-             <div className="flex-1 flex flex-col justify-center gap-6 p-6 rounded-xl bg-gradient-to-br from-zuno-dark/40 to-transparent border border-white/5">
-                {!originalImage ? (
-                  <div className="text-center text-zuno-muted opacity-50">
-                    <Wand2 size={48} className="mx-auto mb-4" />
-                    <p>Faça upload de uma imagem para começar a mágica.</p>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <label className="text-sm text-white font-medium">O que você deseja mudar?</label>
+                    <textarea
+                      value={prompt}
+                      onChange={(e) => setPrompt(e.target.value)}
+                      placeholder="Ex: Adicione um filtro vintage, remova o fundo, coloque óculos escuros..."
+                      className="w-full bg-zuno-black border border-white/10 rounded-lg p-3 text-white placeholder-zuno-muted focus:outline-none focus:border-zuno-accent focus:ring-1 focus:ring-zuno-accent resize-none h-32"
+                    />
                   </div>
-                ) : (
-                  <>
-                    <div className="space-y-2">
-                      <label className="text-sm text-white font-medium">O que você deseja mudar?</label>
-                      <textarea
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        placeholder="Ex: Adicione um filtro vintage, remova o fundo, coloque óculos escuros..."
-                        className="w-full bg-zuno-black border border-white/10 rounded-lg p-3 text-white placeholder-zuno-muted focus:outline-none focus:border-zuno-accent focus:ring-1 focus:ring-zuno-accent resize-none h-32"
-                      />
-                    </div>
-                    <button
-                      onClick={handleGenerate}
-                      disabled={isLoading || !prompt.trim()}
-                      className={`w-full py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${
-                        isLoading || !prompt.trim() 
-                        ? 'bg-zuno-dark text-zuno-muted cursor-not-allowed' 
+                  <button
+                    onClick={handleGenerate}
+                    disabled={isLoading || !prompt.trim()}
+                    className={`w-full py-4 rounded-lg font-bold flex items-center justify-center gap-2 transition-all ${isLoading || !prompt.trim()
+                        ? 'bg-zuno-dark text-zuno-muted cursor-not-allowed'
                         : 'bg-gradient-to-r from-zuno-accent to-emerald-400 text-zuno-black hover:scale-[1.02] shadow-lg shadow-emerald-900/20'
                       }`}
-                    >
-                      {isLoading ? (
-                        <>
-                          <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
-                          Criando Mágica...
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 size={20} />
-                          Gerar Imagem
-                        </>
-                      )}
-                    </button>
-                  </>
-                )}
-             </div>
-           )}
+                  >
+                    {isLoading ? (
+                      <>
+                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin"></div>
+                        Criando Mágica...
+                      </>
+                    ) : (
+                      <>
+                        <Wand2 size={20} />
+                        Gerar Imagem
+                      </>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
       </div>
