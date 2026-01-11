@@ -420,8 +420,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       prevTrack,
       toggleExpanded,
       toggleShuffle,
-      toggleExpanded,
-      toggleShuffle,
       cycleRepeatMode,
       isLiked,
       toggleLike

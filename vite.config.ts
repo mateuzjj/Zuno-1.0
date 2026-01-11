@@ -22,12 +22,7 @@ export default defineConfig(({ mode }) => {
       build: {
         // Otimizações para mobile/iOS
         target: 'es2015',
-        minify: 'terser',
-        terserOptions: {
-          compress: {
-            drop_console: mode === 'production',
-          },
-        },
+        minify: 'esbuild',
         rollupOptions: {
           output: {
             manualChunks: {
