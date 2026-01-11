@@ -65,11 +65,7 @@
       -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
       touch-action: manipulation;
-      /* iOS Safe Area Support */
-      padding-top: env(safe-area-inset-top);
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-      padding-right: env(safe-area-inset-right);
+      /* iOS Safe Area Support - padding removed from body to avoid duplication with child elements */
     }
 
     /* Prevent zoom on input focus (iOS) */
@@ -137,6 +133,17 @@
 
     .pb-safe {
       padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
+    }
+
+    /* PlayerBar bottom positioning with safe area for all breakpoints */
+    .player-bar-safe {
+      bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+    }
+    
+    @media (min-width: 768px) {
+      .player-bar-safe {
+        bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
+      }
     }
 
     /* Better touch targets for iOS */
