@@ -367,6 +367,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setVolumeBeforeMute(volume);
         audioRef.current.volume = 0;
         volumeRef.current = 0;
+        setVolumeState(0); // Fix: Update volume state to 0 when muting
       } else {
         // Desmutando: restaurar volume anterior ou 0.5 se não houver
         const volumeToRestore = volumeBeforeMute > 0 ? volumeBeforeMute : 0.5;

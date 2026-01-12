@@ -156,6 +156,17 @@
       }
     }
 
+    /* Responsive bottom positioning for PlayerBar */
+    .player-bar-responsive {
+      bottom: calc(6rem + env(safe-area-inset-bottom));
+    }
+    
+    @media (min-width: 768px) {
+      .player-bar-responsive {
+        bottom: calc(1.5rem + env(safe-area-inset-bottom));
+      }
+    }
+
     /* Better touch targets for iOS */
     button, a {
       -webkit-tap-highlight-color: transparent;
