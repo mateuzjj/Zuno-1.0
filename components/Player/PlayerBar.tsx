@@ -24,12 +24,15 @@ export const PlayerBar: React.FC = () => {
 
   return (
     <div 
-      className="fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/95 border border-white/5 p-3 md:p-4 z-50 rounded-2xl md:rounded-3xl backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 bottom-24 md:bottom-6"
+      className="fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/95 border border-white/5 p-3 md:p-4 z-50 rounded-2xl md:rounded-3xl backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300"
       style={{
         left: 'calc(0.5rem + env(safe-area-inset-left))',
         right: 'calc(0.5rem + env(safe-area-inset-right))',
-        bottom: 'calc(6rem + env(safe-area-inset-bottom))'
-      }}
+        bottom: 'calc(6rem + env(safe-area-inset-bottom))',
+        '@media (min-width: 768px)': {
+          bottom: 'calc(1.5rem + env(safe-area-inset-bottom))'
+        }
+      } as React.CSSProperties & { '@media (min-width: 768px)': { bottom: string } }}
     >
       <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4 flex-wrap md:flex-nowrap">
 
