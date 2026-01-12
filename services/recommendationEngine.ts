@@ -2,6 +2,7 @@ import { Track, ContextType, SpotifyTrack } from '../types';
 import { SpotifyClient } from './spotifyClient';
 import { MOCK_TRACKS } from './mockData';
 import { api } from './api';
+import { HybridRecommendationEngine } from './hybridRecommendationEngine';
 
 // Helper to map SpotifyTrack to internal Track type
 const mapSpotifyToTrack = (st: SpotifyTrack): Track => ({
@@ -101,45 +102,72 @@ export const getTracksByContext = async (context: ContextType): Promise<Track[]>
     }
 };
 
-// 2. Collaborative Filtering (Replaced by Seed-Based Recs)
+// 2. Collaborative Filtering (Improved with Hybrid Engine)
 export const getCollaborativeRecommendations = async (likedTrackId: string): Promise<Track[]> => {
     try {
-        const recommendations = await SpotifyClient.getRecommendations(
-            [likedTrackId],
-            [],
-            {},
-            10
-        );
-        return recommendations.map(mapSpotifyToTrack);
+        // First, get the track details
+        const track = await api.search(likedTrackId).then(results => results[0]);
+        
+        if (!track) {
+            // Fallback to Spotify API
+            const recommendations = await SpotifyClient.getRecommendations(
+                [likedTrackId],
+                [],
+                {},
+                10
+            );
+            return recommendations.map(mapSpotifyToTrack);
+        }
+
+        // Use hybrid engine for better recommendations
+        const recommendations = await HybridRecommendationEngine.getSimilarTracks(track, 15);
+        return recommendations;
     } catch (error) {
         console.error('Failed to get collaborative recs:', error);
         return [];
     }
 };
 
-// 3. Generate Custom Playlist from Seeds (The "Generator" Feature)
+// 3. Generate Custom Playlist from Seeds (The "Generator" Feature) - Now Hybrid
 export const generatePlaylistFromSeeds = async (
     seeds: Track[],
     settings: { energy?: number, valence?: number, bpm?: number }
 ): Promise<Track[]> => {
     try {
-        const seedIds = seeds.map(t => t.id);
-
-        const recommendations = await SpotifyClient.getRecommendations(
-            seedIds,
-            [],
+        // Use hybrid recommendation engine for better results
+        const recommendations = await HybridRecommendationEngine.generateHybridRecommendations(
+            seeds,
             {
-                target_energy: settings.energy,
-                target_valence: settings.valence,
-                target_bpm: settings.bpm
-            },
-            20
+                energy: settings.energy,
+                valence: settings.valence,
+                bpm: settings.bpm,
+                limit: 30,
+                useCache: true
+            }
         );
 
-        return recommendations.map(mapSpotifyToTrack);
+        return recommendations;
     } catch (error) {
-        console.error('Failed to generate playlist:', error);
-        throw error;
+        console.error('Failed to generate playlist with hybrid engine, falling back to Spotify:', error);
+        
+        // Fallback to simple Spotify recommendations
+        try {
+            const seedIds = seeds.map(t => t.id);
+            const spotifyRecs = await SpotifyClient.getRecommendations(
+                seedIds,
+                [],
+                {
+                    target_energy: settings.energy,
+                    target_valence: settings.valence,
+                    target_bpm: settings.bpm
+                },
+                20
+            );
+            return spotifyRecs.map(mapSpotifyToTrack);
+        } catch (fallbackError) {
+            console.error('Fallback also failed:', fallbackError);
+            throw error;
+        }
     }
 };
 
@@ -182,8 +210,11 @@ export const rankTracks = (tracks: Track[], userProfile: { energy: number, valen
 export const getAIRecommendations = async (context: ContextType): Promise<Track[]> => {
     console.log(`[Engine] Generating AI playlist for context: ${context}`);
     try {
+        // Import AI service dynamically
+        const { generateTrackList } = await import('./geminiService');
+        
         // 1. Ask AI for a list of songs
-        const aiTracks = await AI.generateTrackList(context);
+        const aiTracks = await generateTrackList(context);
 
         if (!aiTracks || aiTracks.length === 0) {
             console.warn('[Engine] AI returned empty list, falling back to seeds');

@@ -9,17 +9,26 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="ZUNO" />
+  <meta name="apple-touch-fullscreen" content="yes" />
+  
+  <!-- Android & PWA Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="application-name" content="ZUNO" />
   <meta name="theme-color" content="#000000" />
   <meta name="msapplication-TileColor" content="#000000" />
+  <meta name="msapplication-navbutton-color" content="#000000" />
   
-  <!-- Apple Touch Icons -->
+  <!-- Icons -->
   <link rel="apple-touch-icon" href="/icon.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/icon.png" />
   <link rel="icon" type="image/png" href="/icon.png" />
+  <link rel="manifest" href="/manifest.json" />
   
   <!-- Prevent iOS Safari from auto-detecting phone numbers -->
   <meta name="format-detection" content="telephone=no" />
+  
+  <!-- Disable automatic translation -->
+  <meta name="google" content="notranslate" />
   
   <title>ZUNO — Escute Diferente</title>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -135,14 +144,15 @@
       padding-bottom: calc(env(safe-area-inset-bottom) + 1rem);
     }
 
-    /* PlayerBar bottom positioning with safe area for all breakpoints */
-    .player-bar-safe {
-      bottom: calc(64px + env(safe-area-inset-bottom)) !important;
+    /* Main content padding to avoid overlap with player and nav */
+    .player-content-padding {
+      padding-bottom: calc(11rem + env(safe-area-inset-bottom));
     }
     
     @media (min-width: 768px) {
-      .player-bar-safe {
-        bottom: calc(1.5rem + env(safe-area-inset-bottom)) !important;
+      /* Desktop: less padding since nav is hidden */
+      .player-content-padding {
+        padding-bottom: calc(7rem + env(safe-area-inset-bottom));
       }
     }
 
@@ -174,11 +184,71 @@
         user-select: none;
       }
       
-      input, textarea {
+      input, textarea, [contenteditable] {
         -webkit-user-select: text;
         -moz-user-select: text;
         -ms-user-select: text;
         user-select: text;
+      }
+    }
+
+    /* Android specific fixes */
+    @supports (-webkit-appearance: none) {
+      /* Safari/iOS specific styles */
+      body {
+        -webkit-text-size-adjust: 100%;
+      }
+    }
+
+    /* Responsive font sizes */
+    @media (max-width: 375px) {
+      html {
+        font-size: 14px;
+      }
+    }
+
+    @media (min-width: 376px) and (max-width: 767px) {
+      html {
+        font-size: 15px;
+      }
+    }
+
+    @media (min-width: 768px) {
+      html {
+        font-size: 16px;
+      }
+    }
+
+    /* Fix for Android Chrome address bar */
+    @media screen and (max-height: 600px) {
+      /* Smaller screens */
+      .player-content-padding {
+        padding-bottom: calc(10rem + env(safe-area-inset-bottom));
+      }
+    }
+
+    /* Landscape orientation adjustments */
+    @media (orientation: landscape) and (max-height: 500px) {
+      /* Hide nav in landscape mode on very small screens */
+      nav[class*="md:hidden"] {
+        bottom: 0.5rem !important;
+        left: 0.5rem !important;
+        right: 0.5rem !important;
+      }
+      
+      .player-content-padding {
+        padding-bottom: calc(8rem + env(safe-area-inset-bottom));
+      }
+    }
+
+    /* Fix for iOS Safari 15+ address bar */
+    @supports (height: 100dvh) {
+      body {
+        min-height: 100dvh;
+      }
+      
+      main[class*="h-screen"] {
+        height: 100dvh;
       }
     }
   </style>

@@ -29,10 +29,19 @@ interface ZunoDB extends DBSchema {
         };
         indexes: { 'by-timestamp': number };
     };
+    recommendationsCache: {
+        key: string;
+        value: {
+            key: string;
+            recommendations: Track[];
+            timestamp: number;
+        };
+        indexes: { 'by-timestamp': number };
+    };
 }
 
 const DB_NAME = 'ZunoMusicDB';
-const DB_VERSION = 1;
+const DB_VERSION = 3; // Incremented to clear lyrics cache
 
 let dbInstance: IDBPDatabase<ZunoDB> | null = null;
 
@@ -45,7 +54,7 @@ export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
     }
 
     dbInstance = await openDB<ZunoDB>(DB_NAME, DB_VERSION, {
-        upgrade(db) {
+        upgrade(db, oldVersion, newVersion, transaction) {
             // Create playlists store
             if (!db.objectStoreNames.contains('playlists')) {
                 const playlistStore = db.createObjectStore('playlists', { keyPath: 'id' });
@@ -68,6 +77,16 @@ export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
             if (!db.objectStoreNames.contains('lyricsCache')) {
                 const lyricsStore = db.createObjectStore('lyricsCache', { keyPath: 'trackId' });
                 lyricsStore.createIndex('by-timestamp', 'timestamp');
+            } else if (oldVersion < 3) {
+                // Clear lyrics cache if upgrading to v3 (start fresh with new logic)
+                transaction.objectStore('lyricsCache').clear();
+                console.log('[DB] Cleared lyrics cache for version upgrade');
+            }
+
+            // Create recommendationsCache store
+            if (!db.objectStoreNames.contains('recommendationsCache')) {
+                const recStore = db.createObjectStore('recommendationsCache', { keyPath: 'key' });
+                recStore.createIndex('by-timestamp', 'timestamp');
             }
         },
     });

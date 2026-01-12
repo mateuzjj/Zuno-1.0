@@ -19,6 +19,8 @@ export const FullScreenPlayer: React.FC = () => {
         toggleExpanded,
         volume,
         setVolume,
+        toggleMute,
+        isMuted,
         shuffleEnabled,
         toggleShuffle,
         repeatMode,
@@ -201,10 +203,10 @@ export const FullScreenPlayer: React.FC = () => {
                     />
                 </div>
             ) : (
-                <div className="relative z-10 flex-1 flex flex-col items-center justify-center min-h-0">
-                    {/* Volume Orb */}
-                    <div
-                        className="relative w-[35vh] h-[35vh] max-w-[280px] max-h-[280px] md:w-80 md:h-80 flex items-center justify-center select-none"
+                /* Player View - Show lyrics below artist name like first image */
+                <div className="relative z-10 flex-1 flex flex-col items-center justify-center min-h-0 px-4">
+                    {/* Album Art with Volume Orb */}
+                    <div className="relative w-[35vh] h-[35vh] max-w-[280px] max-h-[280px] md:w-80 md:h-80 flex items-center justify-center select-none mb-8"
                         ref={volumeRef}
                         onPointerDown={handlePointerDown}
                         onPointerMove={handlePointerMove}
@@ -231,16 +233,23 @@ export const FullScreenPlayer: React.FC = () => {
                         </svg>
 
                         {/* Volume Icons */}
-                        <div className={`absolute top-0 transform -translate-y-6 md:-translate-y-8 text-white/50 transition-opacity ${isDraggingVolume ? 'opacity-100' : 'opacity-50'}`}>
-                            <Volume2 size={24} />
-                        </div>
-                        <div className={`absolute bottom-0 transform translate-y-6 md:translate-y-8 text-white/50 transition-opacity ${isDraggingVolume ? 'opacity-100' : 'opacity-50'}`}>
-                            <VolumeX size={24} />
+                        <div className="absolute inset-0 flex items-center justify-center">
+                            {isMuted ? (
+                                <VolumeX size={48} className="text-white/20" />
+                            ) : volume < 0.3 ? (
+                                <Volume2 size={48} className="text-white/20" />
+                            ) : (
+                                <Volume2 size={48} className="text-white/20" />
+                            )}
                         </div>
 
                         {/* Album Art */}
-                        <div className="relative w-[65%] h-[65%] rounded-full overflow-hidden border-4 border-zuno-card/50 shadow-2xl shadow-zuno-accent/20 z-10 pointer-events-none">
-                            <img src={currentTrack.coverUrl} alt="Album Art" className={`w-full h-full object-cover ${isPlaying ? 'animate-[spin_30s_linear_infinite]' : ''}`} />
+                        <div className="relative w-[60%] h-[60%] rounded-full overflow-hidden shadow-2xl">
+                            <img
+                                src={currentTrack.coverUrl}
+                                alt={currentTrack.title}
+                                className="w-full h-full object-cover"
+                            />
                         </div>
 
                         {/* Volume Knob */}
@@ -249,27 +258,105 @@ export const FullScreenPlayer: React.FC = () => {
                             style={{
                                 left: `calc(${(knobPos.x / 320) * 100}% - 16px)`,
                                 top: `calc(${(knobPos.y / 320) * 100}% - 16px)`,
-                                transform: isDraggingVolume ? 'scale(1.2)' : 'scale(1)'
+                                transform: isDraggingVolume ? 'scale(1.2)' : 'scale(1)',
+                                backgroundColor: isMuted ? '#EF4444' : 'white'
                             }}
                         >
-                            <span className="text-black text-[8px] md:text-[10px] font-bold font-mono">{Math.round(volume * 100)}</span>
+                            <span className="text-black text-[8px] md:text-[10px] font-bold font-mono">
+                                {isMuted ? 'M' : Math.round(volume * 100)}
+                            </span>
                         </div>
+
+                        {/* Mute Button */}
+                        <button
+                            onClick={toggleMute}
+                            className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-[180%] w-12 h-12 rounded-full flex items-center justify-center transition-colors duration-300 ${
+                                isMuted ? 'bg-red-500 text-white shadow-lg shadow-red-500/50' : 'bg-white/10 text-white/70 hover:bg-white/20'
+                            }`}
+                            aria-label={isMuted ? 'Unmute' : 'Mute'}
+                        >
+                            {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+                        </button>
                     </div>
 
-                    {/* Track Info */}
-                    <div className="mt-4 md:mt-16 text-center space-y-1 md:space-y-2 shrink-0 flex flex-col items-center">
-                        <div className="flex items-center gap-4">
-                            <div className="text-center">
-                                <h2 className="text-xl md:text-3xl font-bold text-white tracking-tight line-clamp-1 px-4">{currentTrack.title}</h2>
-                                <p className="text-base md:text-lg text-zuno-muted font-medium">{currentTrack.artist}</p>
+                    {/* Song Info with Lyrics */}
+                    <div className="text-center max-w-md px-4">
+                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                            {currentTrack.title}
+                        </h2>
+                        <p className="text-sm md:text-base text-zuno-muted mb-6">
+                            {currentTrack.artist}
+                        </p>
+
+                        {/* Lyrics Display - Below artist like first image */}
+                        {currentLyrics && !currentLyrics.instrumental && (
+                            <div className="space-y-2 text-center">
+                                {(() => {
+                                    // Find current line for synced lyrics
+                                    if (currentLyrics.syncedLyrics && currentLyrics.syncedLyrics.length > 0) {
+                                        let currentLineIndex = -1;
+                                        for (let i = currentLyrics.syncedLyrics.length - 1; i >= 0; i--) {
+                                            if (currentTime >= currentLyrics.syncedLyrics[i].time) {
+                                                currentLineIndex = i;
+                                                break;
+                                            }
+                                        }
+                                        
+                                        if (currentLineIndex >= 0) {
+                                            const currentLine = currentLyrics.syncedLyrics[currentLineIndex];
+                                            const prevLine = currentLineIndex > 0 ? currentLyrics.syncedLyrics[currentLineIndex - 1] : null;
+                                            const nextLine = currentLineIndex < currentLyrics.syncedLyrics.length - 1 
+                                                ? currentLyrics.syncedLyrics[currentLineIndex + 1] 
+                                                : null;
+                                            
+                                            return (
+                                                <>
+                                                    {prevLine && (
+                                                        <p className="text-sm md:text-base text-white/50 transition-all duration-300">
+                                                            {prevLine.text}
+                                                        </p>
+                                                    )}
+                                                    <p className="text-base md:text-lg text-white font-bold transition-all duration-300">
+                                                        {currentLine.text}
+                                                    </p>
+                                                    {nextLine && (
+                                                        <p className="text-sm md:text-base text-white/50 transition-all duration-300">
+                                                            {nextLine.text}
+                                                        </p>
+                                                    )}
+                                                </>
+                                            );
+                                        }
+                                    }
+                                    
+                                    // Fallback to plain lyrics
+                                    if (currentLyrics.plainLyrics) {
+                                        const lines = currentLyrics.plainLyrics.split('\n').filter(l => l.trim()).slice(0, 3);
+                                        return (
+                                            <>
+                                                {lines.map((line, idx) => (
+                                                    <p 
+                                                        key={idx} 
+                                                        className={`text-sm md:text-base transition-all duration-300 ${
+                                                            idx === 1 ? 'text-white font-bold' : 'text-white/50'
+                                                        }`}
+                                                    >
+                                                        {line.trim()}
+                                                    </p>
+                                                ))}
+                                            </>
+                                        );
+                                    }
+                                    
+                                    return null;
+                                })()}
                             </div>
-                            <button
-                                onClick={toggleLike}
-                                className={`transition-colors hover:scale-110 p-2 ${isLiked ? 'text-zuno-accent' : 'text-white/40 hover:text-white'}`}
-                            >
-                                <Heart size={24} fill={isLiked ? "currentColor" : "none"} />
-                            </button>
-                        </div>
+                        )}
+                        {lyricsLoading && (
+                            <div className="mt-4">
+                                <p className="text-sm text-white/40 animate-pulse">Loading lyrics...</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

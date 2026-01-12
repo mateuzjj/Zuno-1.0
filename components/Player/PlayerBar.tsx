@@ -6,7 +6,7 @@ import { toast } from '../UI/Toast';
 import { PlayerStatus } from '../../types';
 
 export const PlayerBar: React.FC = () => {
-  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode, isLiked, toggleLike } = usePlayer();
+  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode, isLiked, toggleLike, currentLyrics, lyricsLoading } = usePlayer();
 
   if (!currentTrack) return null;
 
@@ -23,11 +23,18 @@ export const PlayerBar: React.FC = () => {
   const isPlaying = status === PlayerStatus.PLAYING;
 
   return (
-    <div className="fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/95 border border-white/5 p-3 md:p-4 z-50 rounded-2xl md:rounded-3xl backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 safe-left safe-right player-bar-safe">
-      <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
+    <div 
+      className="fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/95 border border-white/5 p-3 md:p-4 z-50 rounded-2xl md:rounded-3xl backdrop-blur-xl shadow-2xl shadow-black/50 transition-all duration-300 bottom-24 md:bottom-6"
+      style={{
+        left: 'calc(0.5rem + env(safe-area-inset-left))',
+        right: 'calc(0.5rem + env(safe-area-inset-right))',
+        bottom: 'calc(6rem + env(safe-area-inset-bottom))'
+      }}
+    >
+      <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4 flex-wrap md:flex-nowrap">
 
         {/* Track Info */}
-        <div className="flex items-center gap-4 w-1/3 min-w-[120px]">
+        <div className="flex items-center gap-4 flex-1 md:w-1/3 min-w-[120px] max-w-full md:max-w-none">
           <div
             className="flex items-center gap-4 cursor-pointer group"
             onClick={toggleExpanded}
@@ -42,13 +49,82 @@ export const PlayerBar: React.FC = () => {
                 <Maximize2 size={20} className="text-white" />
               </div>
             </div>
-            <div className="hidden md:block overflow-hidden">
+            <div className="hidden md:block overflow-hidden flex-1 min-w-0">
               <h4 className="text-sm font-bold text-white truncate hover:underline cursor-pointer">
                 {currentTrack.title}
               </h4>
               <p className="text-xs text-zuno-muted truncate hover:text-white cursor-pointer transition-colors">
                 {currentTrack.artist}
               </p>
+              {/* Lyrics Display - Similar to first image reference */}
+              {currentLyrics && !currentLyrics.instrumental && (
+                <div className="mt-2 space-y-0.5 max-w-[280px]">
+                  {(() => {
+                    // Find current line for synced lyrics
+                    if (currentLyrics.syncedLyrics && currentLyrics.syncedLyrics.length > 0) {
+                      let currentLineIndex = -1;
+                      for (let i = currentLyrics.syncedLyrics.length - 1; i >= 0; i--) {
+                        if (currentTime >= currentLyrics.syncedLyrics[i].time) {
+                          currentLineIndex = i;
+                          break;
+                        }
+                      }
+                      
+                      if (currentLineIndex >= 0) {
+                        const currentLine = currentLyrics.syncedLyrics[currentLineIndex];
+                        const prevLine = currentLineIndex > 0 ? currentLyrics.syncedLyrics[currentLineIndex - 1] : null;
+                        const nextLine = currentLineIndex < currentLyrics.syncedLyrics.length - 1 
+                          ? currentLyrics.syncedLyrics[currentLineIndex + 1] 
+                          : null;
+                        
+                        return (
+                          <>
+                            {prevLine && (
+                              <p className="text-xs text-white/40 truncate transition-all duration-300">
+                                {prevLine.text}
+                              </p>
+                            )}
+                            <p className="text-xs text-white font-medium truncate transition-all duration-300">
+                              {currentLine.text}
+                            </p>
+                            {nextLine && (
+                              <p className="text-xs text-white/40 truncate transition-all duration-300">
+                                {nextLine.text}
+                              </p>
+                            )}
+                          </>
+                        );
+                      }
+                    }
+                    
+                    // Fallback to plain lyrics (show first 3 lines)
+                    if (currentLyrics.plainLyrics) {
+                      const lines = currentLyrics.plainLyrics.split('\n').filter(l => l.trim()).slice(0, 3);
+                      return (
+                        <>
+                          {lines.map((line, idx) => (
+                            <p 
+                              key={idx} 
+                              className={`text-xs truncate transition-all duration-300 ${
+                                idx === 1 ? 'text-white font-medium' : 'text-white/40'
+                              }`}
+                            >
+                              {line.trim()}
+                            </p>
+                          ))}
+                        </>
+                      );
+                    }
+                    
+                    return null;
+                  })()}
+                </div>
+              )}
+              {lyricsLoading && (
+                <div className="mt-2">
+                  <p className="text-xs text-white/40 animate-pulse">Loading lyrics...</p>
+                </div>
+              )}
             </div>
           </div>
 

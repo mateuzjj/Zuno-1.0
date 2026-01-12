@@ -7,12 +7,21 @@ export interface Track {
   duration: number; // seconds
   streamUrl?: string; // Optional because it is fetched on demand
   quality?: string;
-  // Recommendation Engine Fields
+  // Recommendation Engine Fields - Audio Features (Spotify-like)
   genre: string[];
-  bpm: number;
-  energy: number;
-  valence: number;
-  popularity: number;
+  bpm: number; // Tempo
+  energy: number; // 0-1
+  valence: number; // 0-1 (positivity/happiness)
+  popularity: number; // 0-100
+  // Extended Audio Features (for hybrid recommendation)
+  danceability?: number; // 0-1
+  acousticness?: number; // 0-1
+  instrumentalness?: number; // 0-1
+  liveness?: number; // 0-1
+  speechiness?: number; // 0-1
+  loudness?: number; // -60 to 0 dB
+  mode?: number; // 0 (minor) or 1 (major)
+  key?: number; // 0-11 (pitch class)
 }
 
 export enum ContextType {

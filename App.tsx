@@ -79,7 +79,10 @@ const ZunoApp: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen bg-zuno-black text-zuno-text font-sans selection:bg-zuno-accent selection:text-zuno-black">
+    <div 
+      className="flex min-h-screen bg-zuno-black text-zuno-text font-sans selection:bg-zuno-accent selection:text-zuno-black"
+      style={{ minHeight: '100dvh' }}
+    >
       {/* Show loading state during Spotify callback processing */}
       {isProcessingCallback ? (
         <div className="flex-1 flex items-center justify-center">
@@ -93,7 +96,7 @@ const ZunoApp: React.FC = () => {
           <Sidebar currentView={currentView} setView={setCurrentView} />
 
           {/* Main Content Area */}
-          <main className="flex-1 md:ml-64 pb-32 overflow-y-auto h-screen bg-zuno-main scroll-smooth safe-top" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 8rem)' }}>
+          <main className="flex-1 md:ml-64 overflow-y-auto h-screen bg-zuno-main scroll-smooth safe-top player-content-padding">
 
 
             {renderView()}

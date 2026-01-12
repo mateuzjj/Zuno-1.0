@@ -51,7 +51,6 @@ export const ImageEditor: React.FC = () => {
     setIsLoading(true);
     try {
       alert("Recurso de edição de imagem desabilitado. Configure uma API de IA para usar esta funcionalidade.");
-      setIsLoading(false);
     } catch (error) {
       console.error(error);
       alert("Erro ao conectar com a mágica. Verifique sua conexão ou API Key.");

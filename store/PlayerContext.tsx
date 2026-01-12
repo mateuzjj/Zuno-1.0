@@ -17,7 +17,6 @@ interface PlayerContextType extends PlayerState {
   prevTrack: () => void;
   toggleExpanded: () => void;
   toggleShuffle: () => void;
-  toggleShuffle: () => void;
   cycleRepeatMode: () => void;
   isLiked: boolean;
   toggleLike: () => void;
@@ -33,6 +32,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(1);
   const [isMuted, setIsMuted] = useState(false);
+  const [volumeBeforeMute, setVolumeBeforeMute] = useState(1);
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
   const [repeatMode, setRepeatMode] = useState<RepeatMode>('off');
   const [queue, setQueue] = useState<Track[]>([]);
@@ -42,6 +42,15 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentLyrics, setCurrentLyrics] = useState<Lyrics | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
+
+  // Refs to avoid stale closures in event handlers
+  const repeatModeRef = useRef<RepeatMode>(repeatMode);
+  const queueRef = useRef<Track[]>(queue);
+  const currentIndexRef = useRef<number>(currentIndex);
+  const statusRef = useRef<PlayerStatus>(status);
+  const volumeRef = useRef<number>(volume);
+  const isMutedRef = useRef<boolean>(isMuted);
+  const playTrackInternalRef = useRef<((track: Track) => Promise<void>) | null>(null);
 
   // Helper function to shuffle an array
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -53,6 +62,68 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return shuffled;
   };
 
+  // Helper to actually load and play a track
+  const playTrackInternal = async (track: Track) => {
+    if (!audioRef.current) return;
+
+    // UI Feedback immediately
+    setCurrentTrack(track);
+    setStatus(PlayerStatus.LOADING);
+    setCurrentTime(0);
+    // Use track duration as fallback until metadata loads
+    setDuration(track.duration || 0);
+
+    try {
+      // 1. Get the stream URL (async operation)
+      const streamUrl = await api.getStreamUrl(track.id);
+
+      if (!streamUrl) throw new Error("Stream URL not found");
+
+      // 2. Set Audio Source - use refs to get current values
+      audioRef.current.src = streamUrl;
+      audioRef.current.volume = volumeRef.current;
+      audioRef.current.muted = isMutedRef.current;
+
+      // 3. Play
+      await audioRef.current.play();
+      setStatus(PlayerStatus.PLAYING);
+      setIsExpanded(true); // Auto expand on play (optional, but good for "Modern" vibes)
+
+    } catch (err) {
+      console.error("Playback failed:", err);
+      setStatus(PlayerStatus.ERROR);
+    }
+  };
+
+  // Update refs when values change
+  useEffect(() => {
+    repeatModeRef.current = repeatMode;
+  }, [repeatMode]);
+
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
+
+  useEffect(() => {
+    currentIndexRef.current = currentIndex;
+  }, [currentIndex]);
+
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
+
+  useEffect(() => {
+    playTrackInternalRef.current = playTrackInternal;
+  }, []);
+
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
@@ -63,28 +134,35 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       if (!Number.isNaN(audio.duration)) setDuration(audio.duration);
     };
     const handleEnded = () => {
-      // Handle repeat and queue logic
-      if (repeatMode === 'one') {
+      // Handle repeat and queue logic - use refs to get current values
+      const currentRepeatMode = repeatModeRef.current;
+      const currentQueue = queueRef.current;
+      const currentIdx = currentIndexRef.current;
+      const playTrackFn = playTrackInternalRef.current;
+
+      if (!playTrackFn) return;
+
+      if (currentRepeatMode === 'one') {
         // Repeat current track
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(console.error);
         }
-      } else if (repeatMode === 'all' && queue.length > 0) {
+      } else if (currentRepeatMode === 'all' && currentQueue.length > 0) {
         // Go to next track, will loop back to start if at end
-        const nextIdx = (currentIndex + 1) % queue.length;
-        const nextTrk = queue[nextIdx];
+        const nextIdx = (currentIdx + 1) % currentQueue.length;
+        const nextTrk = currentQueue[nextIdx];
         if (nextTrk) {
           setCurrentIndex(nextIdx);
-          playTrackInternal(nextTrk);
+          playTrackFn(nextTrk);
         }
-      } else if (queue.length > 0 && currentIndex < queue.length - 1) {
+      } else if (currentQueue.length > 0 && currentIdx < currentQueue.length - 1) {
         // Normal next track (repeat off)
-        const nextIdx = currentIndex + 1;
-        const nextTrk = queue[nextIdx];
+        const nextIdx = currentIdx + 1;
+        const nextTrk = currentQueue[nextIdx];
         if (nextTrk) {
           setCurrentIndex(nextIdx);
-          playTrackInternal(nextTrk);
+          playTrackFn(nextTrk);
         } else {
           setStatus(PlayerStatus.STOPPED);
         }
@@ -93,7 +171,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       }
     };
     const handleCanPlay = () => {
-      if (status === PlayerStatus.LOADING) {
+      // Use ref to get current status
+      if (statusRef.current === PlayerStatus.LOADING) {
         audio.play().catch(e => console.error("Auto-play blocked:", e));
         setStatus(PlayerStatus.PLAYING);
       }
@@ -166,6 +245,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         );
 
         console.log('[Lyrics] Loaded:', lyrics ? (lyrics.instrumental ? 'Instrumental' : `${lyrics.syncedLyrics?.length || 0} synced lines, plain: ${!!lyrics.plainLyrics}`) : 'Not found');
+        console.log('[Lyrics] Full lyrics object:', lyrics);
         setCurrentLyrics(lyrics);
       } catch (error) {
         console.error('[Lyrics] Failed to load:', error);
@@ -206,39 +286,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     } else {
       await LikedSongsService.likeTrack(currentTrack);
       setIsLiked(true);
-    }
-  };
-
-  // Helper to actually load and play a track
-  const playTrackInternal = async (track: Track) => {
-    if (!audioRef.current) return;
-
-    // UI Feedback immediately
-    setCurrentTrack(track);
-    setStatus(PlayerStatus.LOADING);
-    setCurrentTime(0);
-    // Use track duration as fallback until metadata loads
-    setDuration(track.duration || 0);
-
-    try {
-      // 1. Get the stream URL (async operation)
-      const streamUrl = await api.getStreamUrl(track.id);
-
-      if (!streamUrl) throw new Error("Stream URL not found");
-
-      // 2. Set Audio Source
-      audioRef.current.src = streamUrl;
-      audioRef.current.volume = volume;
-      audioRef.current.muted = isMuted;
-
-      // 3. Play
-      await audioRef.current.play();
-      setStatus(PlayerStatus.PLAYING);
-      setIsExpanded(true); // Auto expand on play (optional, but good for "Modern" vibes)
-
-    } catch (err) {
-      console.error("Playback failed:", err);
-      setStatus(PlayerStatus.ERROR);
     }
   };
 
@@ -285,9 +332,18 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     if (audioRef.current) {
       audioRef.current.volume = vol;
       setVolumeState(vol);
+      volumeRef.current = vol;
+      
+      // Se o volume foi ajustado para > 0 e estava mudo, desmutar
       if (vol > 0 && isMuted) {
         setIsMuted(false);
         audioRef.current.muted = false;
+        isMutedRef.current = false;
+      }
+      
+      // Atualizar o volume antes do mute se não estiver mudo
+      if (!isMuted) {
+        setVolumeBeforeMute(vol);
       }
     }
   };
@@ -295,7 +351,22 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const toggleMute = () => {
     if (audioRef.current) {
       const newMuted = !isMuted;
+      
+      if (newMuted) {
+        // Mutando: salvar volume atual e definir para 0
+        setVolumeBeforeMute(volume);
+        audioRef.current.volume = 0;
+        volumeRef.current = 0;
+      } else {
+        // Desmutando: restaurar volume anterior ou 0.5 se não houver
+        const volumeToRestore = volumeBeforeMute > 0 ? volumeBeforeMute : 0.5;
+        audioRef.current.volume = volumeToRestore;
+        volumeRef.current = volumeToRestore;
+        setVolumeState(volumeToRestore);
+      }
+      
       setIsMuted(newMuted);
+      isMutedRef.current = newMuted;
       audioRef.current.muted = newMuted;
     }
   };
