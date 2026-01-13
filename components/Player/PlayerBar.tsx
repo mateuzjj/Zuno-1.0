@@ -55,9 +55,9 @@ export const PlayerBar: React.FC = () => {
               <p className="text-xs text-zuno-muted truncate hover:text-white cursor-pointer transition-colors">
                 {currentTrack.artist}
               </p>
-              {/* Lyrics Display - Similar to first image reference */}
+              {/* Lyrics Display - Hidden on mobile for compactness */}
               {currentLyrics && !currentLyrics.instrumental && (
-                <div className="mt-2 space-y-0.5 max-w-[280px]">
+                <div className="hidden md:block mt-2 space-y-0.5 max-w-[280px]">
                   {(() => {
                     // Find current line for synced lyrics
                     if (currentLyrics.syncedLyrics && currentLyrics.syncedLyrics.length > 0) {
@@ -119,7 +119,7 @@ export const PlayerBar: React.FC = () => {
                 </div>
               )}
               {lyricsLoading && (
-                <div className="mt-2">
+                <div className="hidden md:block mt-2">
                   <p className="text-xs text-white/40 animate-pulse">Loading lyrics...</p>
                 </div>
               )}
@@ -132,7 +132,7 @@ export const PlayerBar: React.FC = () => {
               e.stopPropagation();
               toggleLike();
             }}
-            className={`transition-colors hover:scale-110 ${isLiked ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
+            className={`ml-auto transition-colors hover:scale-110 ${isLiked ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
           >
             <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
           </button>
