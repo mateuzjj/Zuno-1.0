@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { usePlayer } from '../../store/PlayerContext';
 import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download, Shuffle, Repeat, Repeat1, Heart } from 'lucide-react';
 import { DownloadService } from '../../services/download';
@@ -7,6 +7,30 @@ import { PlayerStatus } from '../../types';
 
 export const PlayerBar: React.FC = () => {
   const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode, isLiked, toggleLike, currentLyrics, lyricsLoading } = usePlayer();
+  const [isVisible, setIsVisible] = useState(true);
+  const lastScrollY = useRef(0);
+
+  useEffect(() => {
+    const mainElement = document.querySelector('main');
+    if (!mainElement) return;
+
+    const handleScroll = () => {
+      const currentScrollY = mainElement.scrollTop;
+
+      // Determine direction
+      // Threshold of 50px to avoid jitter
+      if (currentScrollY > lastScrollY.current && currentScrollY > 100) {
+        setIsVisible(false);
+      } else if (currentScrollY < lastScrollY.current) {
+        setIsVisible(true);
+      }
+
+      lastScrollY.current = currentScrollY;
+    };
+
+    mainElement.addEventListener('scroll', handleScroll, { passive: true });
+    return () => mainElement.removeEventListener('scroll', handleScroll);
+  }, []);
 
   if (!currentTrack) return null;
 
@@ -24,8 +48,9 @@ export const PlayerBar: React.FC = () => {
 
   return (
     <div
-      className="fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/98 border border-white/10 p-3 md:p-4 z-50 rounded-3xl backdrop-blur-2xl shadow-2xl shadow-black/50 transition-all duration-300 player-bar-bottom"
+      className={`fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/98 border border-white/10 p-3 md:p-4 z-50 rounded-3xl backdrop-blur-2xl shadow-2xl shadow-black/50 transition-all duration-300 player-bar-bottom ${isVisible ? 'translate-y-0' : 'translate-y-[200%] md:translate-y-0'}`}
       style={{
+        bottom: 'calc(6.5rem + env(safe-area-inset-bottom))',
         left: 'calc(0.5rem + env(safe-area-inset-left))',
         right: 'calc(0.5rem + env(safe-area-inset-right))'
       }}
