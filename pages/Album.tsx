@@ -94,7 +94,7 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                     </div>
 
                     <button
-                        onClick={() => tracks.length > 0 && playTrack(tracks[0])}
+                        onClick={() => tracks.length > 0 && playTrack(tracks[0], tracks)}
                         className="bg-zuno-accent text-black w-14 h-14 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-lg shadow-green-500/30"
                     >
                         <Play fill="currentColor" size={24} className="ml-1" />
@@ -115,7 +115,7 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                     {tracks.map((track, idx) => (
                         <div
                             key={track.id}
-                            onClick={() => playTrack(track)}
+                            onClick={() => playTrack(track, tracks)}
                             className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group cursor-pointer transition-colors border-b border-white/5 last:border-0"
                         >
                             <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
@@ -123,9 +123,9 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                                 <div className="flex items-center gap-2">
                                     <h4 className="font-medium text-white group-hover:text-zuno-accent transition-colors text-lg">{track.title}</h4>
                                     {downloadedTrackIds.has(track.id) && (
-                                        <CheckCircle2 
-                                            size={16} 
-                                            className="text-zuno-accent flex-shrink-0" 
+                                        <CheckCircle2
+                                            size={16}
+                                            className="text-zuno-accent flex-shrink-0"
                                             fill="currentColor"
                                             title="Música salva offline"
                                         />

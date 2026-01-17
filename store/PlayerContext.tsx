@@ -105,9 +105,20 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       audioRef.current.muted = isMutedRef.current;
 
       // 3. Play
-      await audioRef.current.play();
-      setStatus(PlayerStatus.PLAYING);
-      setIsExpanded(true); // Auto expand on play (optional, but good for "Modern" vibes)
+      try {
+        await audioRef.current.play();
+        setStatus(PlayerStatus.PLAYING);
+        setIsExpanded(true); // Auto expand on play (optional, but good for "Modern" vibes)
+      } catch (playError: any) {
+        console.error("Play failed:", playError);
+        // Se falhar por autoplay, tentar novamente quando houver interação do usuário
+        if (playError.name === 'NotAllowedError') {
+          console.warn('[Player] Autoplay blocked - waiting for user interaction');
+          setStatus(PlayerStatus.PAUSED); // Marcar como pausado, não erro
+        } else {
+          setStatus(PlayerStatus.ERROR);
+        }
+      }
 
     } catch (err) {
       console.error("Playback failed:", err);
@@ -160,41 +171,82 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       const currentIdx = currentIndexRef.current;
       const playTrackFn = playTrackInternalRef.current;
 
-      if (!playTrackFn) return;
+      console.log('[Player] Track ended. Queue length:', currentQueue.length, 'Current index:', currentIdx, 'Repeat mode:', currentRepeatMode);
+
+      if (!playTrackFn) {
+        console.warn('[Player] No playTrackFn available');
+        return;
+      }
+
+      if (currentQueue.length === 0) {
+        console.log('[Player] Queue is empty, stopping');
+        setStatus(PlayerStatus.STOPPED);
+        return;
+      }
 
       if (currentRepeatMode === 'one') {
         // Repeat current track
+        console.log('[Player] Repeating current track');
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(console.error);
         }
-      } else if (currentRepeatMode === 'all' && currentQueue.length > 0) {
-        // Go to next track, will loop back to start if at end
-        const nextIdx = (currentIdx + 1) % currentQueue.length;
-        const nextTrk = currentQueue[nextIdx];
-        if (nextTrk) {
-          setCurrentIndex(nextIdx);
-          playTrackFn(nextTrk);
+        return;
+      }
+
+      // Calculate next index
+      const nextIdx = currentIdx + 1;
+
+      if (nextIdx >= currentQueue.length) {
+        // We're at the end of the queue
+        if (currentRepeatMode === 'all') {
+          // Loop back to the start
+          console.log('[Player] End of queue, looping to start (repeat all)');
+          const firstTrk = currentQueue[0];
+          if (firstTrk) {
+            setCurrentIndex(0);
+            playTrackFn(firstTrk);
+          }
+        } else {
+          // Repeat is off, stop playback
+          console.log('[Player] End of queue, stopping (repeat off)');
+          setStatus(PlayerStatus.STOPPED);
         }
-      } else if (currentQueue.length > 0 && currentIdx < currentQueue.length - 1) {
-        // Normal next track (repeat off)
-        const nextIdx = currentIdx + 1;
+      } else {
+        // Normal case: advance to next track
         const nextTrk = currentQueue[nextIdx];
+        console.log('[Player] Advancing to next track:', nextTrk?.title, 'at index', nextIdx);
         if (nextTrk) {
           setCurrentIndex(nextIdx);
           playTrackFn(nextTrk);
         } else {
+          console.warn('[Player] Next track not found at index', nextIdx);
           setStatus(PlayerStatus.STOPPED);
         }
-      } else {
-        setStatus(PlayerStatus.STOPPED);
       }
     };
     const handleCanPlay = () => {
-      // Use ref to get current status
+      // Tentar reproduzir se não estiver já tocando
+      if (statusRef.current !== PlayerStatus.PLAYING) {
+        audio.play()
+          .then(() => {
+            setStatus(PlayerStatus.PLAYING);
+            console.log('[Player] Auto-play successful');
+          })
+          .catch(e => {
+            console.warn('[Player] Auto-play blocked:', e);
+            setStatus(PlayerStatus.PAUSED);
+          });
+      }
+    };
+    const handleLoadedData = () => {
       if (statusRef.current === PlayerStatus.LOADING) {
-        audio.play().catch(e => console.error("Auto-play blocked:", e));
-        setStatus(PlayerStatus.PLAYING);
+        audio.play()
+          .then(() => setStatus(PlayerStatus.PLAYING))
+          .catch(e => {
+            console.warn('[Player] Auto-play blocked on loadeddata:', e);
+            setStatus(PlayerStatus.PAUSED);
+          });
       }
     };
     const handleError = (e: any) => {
@@ -207,6 +259,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('loadeddata', handleLoadedData);
     audio.addEventListener('error', handleError);
 
     return () => {
@@ -215,6 +268,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('loadeddata', handleLoadedData);
       audio.removeEventListener('error', handleError);
       audio.pause();
       audio.src = "";
@@ -466,20 +520,36 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
+    console.log('[Player] playTrack called:', {
+      trackTitle: track.title,
+      newQueueLength: newQueue?.length,
+      currentQueueLength: queue.length,
+      shuffleEnabled
+    });
+
     if (newQueue && newQueue.length > 0) {
       // New queue provided
       setOriginalQueue(newQueue);
-      setQueue(shuffleEnabled ? shuffleArray([...newQueue]) : newQueue);
+      const finalQueue = shuffleEnabled ? shuffleArray([...newQueue]) : newQueue;
+      setQueue(finalQueue);
 
       // Find index of track in the new queue
-      const trackQueue = shuffleEnabled ? shuffleArray([...newQueue]) : newQueue;
-      const idx = trackQueue.findIndex(t => t.id === track.id);
+      const idx = finalQueue.findIndex(t => t.id === track.id);
       setCurrentIndex(idx >= 0 ? idx : 0);
+
+      console.log('[Player] Queue setup:', {
+        queueLength: finalQueue.length,
+        currentIndex: idx >= 0 ? idx : 0,
+        tracks: finalQueue.map(t => t.title)
+      });
     } else if (queue.length === 0) {
       // No queue, single track playback
       setQueue([track]);
       setOriginalQueue([track]);
       setCurrentIndex(0);
+      console.log('[Player] Single track playback');
+    } else {
+      console.log('[Player] Using existing queue, length:', queue.length);
     }
 
     await playTrackInternal(track);

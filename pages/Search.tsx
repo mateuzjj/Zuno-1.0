@@ -50,7 +50,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
     }
 
     const normalizedQuery = searchQuery.trim().toLowerCase();
-    
+
     // Check cache first
     const cached = searchCache.get(normalizedQuery);
     if (cached && (Date.now() - cached.timestamp) < CACHE_DURATION) {
@@ -69,10 +69,10 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
     let tracksResult: Track[] = [];
     let artistsResult: Artist[] = [];
     let albumsResult: Album[] = [];
-    
+
     try {
       // Load tracks, artists and albums in parallel with timeout
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Search timeout')), 8000)
       );
 
@@ -148,7 +148,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
     try {
       const playlistsData = await Promise.race([
         api.searchPlaylists(searchQuery, 30).catch(() => ({ items: [], total: 0 })),
-        new Promise<{ items: Playlist[], total: number }>((_, reject) => 
+        new Promise<{ items: Playlist[], total: number }>((_, reject) =>
           setTimeout(() => reject(new Error('Playlist search timeout')), 5000)
         )
       ]).catch(() => ({ items: [], total: 0 }));
@@ -191,7 +191,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
   // Auto-load all remaining results functions
   const loadAllAlbums = async (searchQuery: string, currentCount: number, total: number) => {
     if (currentCount >= total) return;
-    
+
     try {
       const batchSize = 50;
       let offset = currentCount;
@@ -201,13 +201,13 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
         const remaining = Math.min(batchSize, total - offset);
         const result = await api.searchAlbums(searchQuery, remaining, offset);
         const newAlbums = result.items || [];
-        
+
         if (newAlbums.length === 0) break;
-        
+
         allAlbums.push(...newAlbums);
         setAlbums([...allAlbums]);
         offset += newAlbums.length;
-        
+
         // Small delay to avoid overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 200));
       }
@@ -220,7 +220,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
 
   const loadAllArtists = async (searchQuery: string, currentCount: number, total: number) => {
     if (currentCount >= total) return;
-    
+
     try {
       const batchSize = 30;
       let offset = currentCount;
@@ -230,13 +230,13 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
         const remaining = Math.min(batchSize, total - offset);
         const result = await api.searchArtists(searchQuery, remaining, offset);
         const newArtists = result.items || [];
-        
+
         if (newArtists.length === 0) break;
-        
+
         allArtists.push(...newArtists);
         setArtists([...allArtists]);
         offset += newArtists.length;
-        
+
         // Small delay to avoid overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 200));
       }
@@ -249,7 +249,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
 
   const loadAllPlaylists = async (searchQuery: string, currentCount: number, total: number) => {
     if (currentCount >= total) return;
-    
+
     try {
       const batchSize = 30;
       let offset = currentCount;
@@ -259,13 +259,13 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
         const remaining = Math.min(batchSize, total - offset);
         const result = await api.searchPlaylists(searchQuery, remaining, offset);
         const newPlaylists = result.items || [];
-        
+
         if (newPlaylists.length === 0) break;
-        
+
         allPlaylists.push(...newPlaylists);
         setPlaylists([...allPlaylists]);
         offset += newPlaylists.length;
-        
+
         // Small delay to avoid overwhelming the API
         await new Promise(resolve => setTimeout(resolve, 200));
       }
@@ -396,16 +396,15 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
             <button
               key={filter}
               onClick={() => setActiveFilter(filter)}
-              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${
-                activeFilter === filter
+              className={`px-4 py-2 rounded-full text-sm font-semibold whitespace-nowrap transition-all ${activeFilter === filter
                   ? 'bg-white text-black'
                   : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white'
-              }`}
+                }`}
             >
-              {filter === 'all' ? 'Todos' : 
-               filter === 'playlists' ? 'Playlists' :
-               filter === 'artists' ? 'Artistas' :
-               filter === 'tracks' ? 'Músicas' : 'Álbuns'}
+              {filter === 'all' ? 'Todos' :
+                filter === 'playlists' ? 'Playlists' :
+                  filter === 'artists' ? 'Artistas' :
+                    filter === 'tracks' ? 'Músicas' : 'Álbuns'}
             </button>
           ))}
         </div>
@@ -420,7 +419,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
         <div className="space-y-8">
           {/* Featured Artist Card (Spotify style) */}
           {topArtist && activeFilter === 'all' && (
-            <div 
+            <div
               className="bg-zuno-card rounded-2xl p-6 hover:bg-zuno-light transition-colors cursor-pointer"
               onClick={() => onNavigate('artist', topArtist.id)}
             >
@@ -505,7 +504,7 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
                     <div
                       key={track.id}
                       className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer group"
-                      onClick={() => playTrack(track)}
+                      onClick={() => playTrack(track, filtered.tracks)}
                     >
                       <div className="w-10 text-zuno-muted text-sm font-mono group-hover:hidden">
                         {index + 1}
