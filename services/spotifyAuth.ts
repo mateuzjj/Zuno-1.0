@@ -18,8 +18,19 @@ if (!CLIENT_ID || CLIENT_ID === 'undefined') {
 }
 
 // Dynamic redirect URI - works with localhost and LAN IPs
+// Spotify requires http://localhost (not https://localhost) for local development
 const getRedirectUri = () => {
     const origin = window.location.origin;
+    const hostname = window.location.hostname;
+    const port = window.location.port;
+    
+    // For localhost, always use http:// (Spotify doesn't accept https://localhost)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+        const portStr = port ? `:${port}` : '';
+        return `http://localhost${portStr}/spotify/callback`;
+    }
+    
+    // For production/other hosts, use the actual origin
     return `${origin}/spotify/callback`;
 };
 

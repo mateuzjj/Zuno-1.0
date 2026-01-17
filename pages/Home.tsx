@@ -3,6 +3,7 @@ import { Play, Music2, TrendingUp } from 'lucide-react';
 import { View, Track, Album, Playlist } from '../types';
 import { api } from '../services/api';
 import { usePlayer } from '../store/PlayerContext';
+import { PullToRefresh } from '../components/UI/PullToRefresh';
 
 interface HomeProps {
   onNavigate: (view: View, id?: string) => void;
@@ -31,7 +32,7 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
       const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 10000): Promise<T> => {
         return Promise.race([
           promise,
-          new Promise<T>((_, reject) => 
+          new Promise<T>((_, reject) =>
             setTimeout(() => reject(new Error('Timeout')), timeoutMs)
           )
         ]);
@@ -151,100 +152,102 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-8">
-      {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-3xl md:text-4xl font-bold text-white">Bem-vindo ao ZUNO</h1>
-        <p className="text-zuno-muted">Descubra música que combina com você</p>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
-        <button
-          onClick={() => onNavigate('library')}
-          className="bg-zuno-card p-6 rounded-2xl text-left hover:bg-zuno-light transition-colors border border-white/5"
-        >
-          <Music2 className="text-zuno-accent mb-2" size={24} />
-          <h3 className="font-bold text-white">Sua Biblioteca</h3>
-          <p className="text-xs text-zuno-muted mt-1">Suas playlists e músicas</p>
-        </button>
-
-        <button
-          onClick={() => onNavigate('search')}
-          className="bg-zuno-card p-6 rounded-2xl text-left hover:bg-zuno-light transition-colors border border-white/5"
-        >
-          <TrendingUp className="text-purple-400 mb-2" size={24} />
-          <h3 className="font-bold text-white">Buscar</h3>
-          <p className="text-xs text-zuno-muted mt-1">Encontre novas músicas</p>
-        </button>
-      </div>
-
-      {/* Multiple Sections */}
-      {loading ? (
-        <div className="text-center py-12">
-          <div className="w-8 h-8 border-4 border-zuno-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+    <PullToRefresh onRefresh={loadHomeData}>
+      <div className="p-4 md:p-8 space-y-8">
+        {/* Header */}
+        <div className="space-y-2">
+          <h1 className="text-3xl md:text-4xl font-bold text-white">Bem-vindo ao ZUNO</h1>
+          <p className="text-zuno-muted">Descubra música que combina com você</p>
         </div>
-      ) : (
-        <div className="space-y-12">
-          {sections.map((section, sectionIndex) => (
-            <div key={sectionIndex} className="space-y-4">
-              <div>
-                <h2 className="text-2xl font-bold text-white">{section.title}</h2>
-                {section.subtitle && (
-                  <p className="text-sm text-zuno-muted mt-1">{section.subtitle}</p>
-                )}
-              </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-                {section.items.map((item) => {
-                  const isTrack = section.type === 'tracks';
-                  const isAlbum = section.type === 'albums';
-                  const isPlaylist = section.type === 'playlists';
-                  
-                  const coverUrl = isTrack 
-                    ? (item as Track).coverUrl 
-                    : isAlbum 
-                    ? (item as Album).coverUrl 
-                    : (item as Playlist).coverUrl || 'https://picsum.photos/seed/playlist/400/400';
-                  
-                  const title = isTrack 
-                    ? (item as Track).title 
-                    : isAlbum 
-                    ? (item as Album).title 
-                    : (item as Playlist).name;
-                  
-                  const subtitle = isTrack 
-                    ? (item as Track).artist 
-                    : isAlbum 
-                    ? (item as Album).artist 
-                    : (item as Playlist).description || 'Playlist';
+        {/* Quick Actions */}
+        <div className="grid grid-cols-2 md:grid-cols-2 gap-4">
+          <button
+            onClick={() => onNavigate('library')}
+            className="bg-zuno-card p-6 rounded-2xl text-left hover:bg-zuno-light transition-colors border border-white/5"
+          >
+            <Music2 className="text-zuno-accent mb-2" size={24} />
+            <h3 className="font-bold text-white">Sua Biblioteca</h3>
+            <p className="text-xs text-zuno-muted mt-1">Suas playlists e músicas</p>
+          </button>
 
-                  return (
-                    <div
-                      key={item.id}
-                      className="bg-zuno-card rounded-xl p-4 hover:bg-zuno-light transition-colors cursor-pointer group"
-                      onClick={() => handleItemClick(item, section.type)}
-                    >
-                      <div className="relative mb-3 aspect-square rounded-lg overflow-hidden">
-                        <img
-                          src={coverUrl}
-                          alt={title}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <Play size={32} className="text-white" fill="white" />
+          <button
+            onClick={() => onNavigate('search')}
+            className="bg-zuno-card p-6 rounded-2xl text-left hover:bg-zuno-light transition-colors border border-white/5"
+          >
+            <TrendingUp className="text-purple-400 mb-2" size={24} />
+            <h3 className="font-bold text-white">Buscar</h3>
+            <p className="text-xs text-zuno-muted mt-1">Encontre novas músicas</p>
+          </button>
+        </div>
+
+        {/* Multiple Sections */}
+        {loading ? (
+          <div className="text-center py-12">
+            <div className="w-8 h-8 border-4 border-zuno-accent border-t-transparent rounded-full animate-spin mx-auto"></div>
+          </div>
+        ) : (
+          <div className="space-y-12">
+            {sections.map((section, sectionIndex) => (
+              <div key={sectionIndex} className="space-y-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-white">{section.title}</h2>
+                  {section.subtitle && (
+                    <p className="text-sm text-zuno-muted mt-1">{section.subtitle}</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                  {section.items.map((item) => {
+                    const isTrack = section.type === 'tracks';
+                    const isAlbum = section.type === 'albums';
+                    const isPlaylist = section.type === 'playlists';
+
+                    const coverUrl = isTrack
+                      ? (item as Track).coverUrl
+                      : isAlbum
+                        ? (item as Album).coverUrl
+                        : (item as Playlist).coverUrl || 'https://picsum.photos/seed/playlist/400/400';
+
+                    const title = isTrack
+                      ? (item as Track).title
+                      : isAlbum
+                        ? (item as Album).title
+                        : (item as Playlist).name;
+
+                    const subtitle = isTrack
+                      ? (item as Track).artist
+                      : isAlbum
+                        ? (item as Album).artist
+                        : (item as Playlist).description || 'Playlist';
+
+                    return (
+                      <div
+                        key={item.id}
+                        className="bg-zuno-card rounded-xl p-4 hover:bg-zuno-light transition-colors cursor-pointer group"
+                        onClick={() => handleItemClick(item, section.type)}
+                      >
+                        <div className="relative mb-3 aspect-square rounded-lg overflow-hidden">
+                          <img
+                            src={coverUrl}
+                            alt={title}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <Play size={32} className="text-white" fill="white" />
+                          </div>
                         </div>
+                        <h4 className="font-bold text-white text-sm truncate">{title}</h4>
+                        <p className="text-xs text-zuno-muted truncate">{subtitle}</p>
                       </div>
-                      <h4 className="font-bold text-white text-sm truncate">{title}</h4>
-                      <p className="text-xs text-zuno-muted truncate">{subtitle}</p>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </PullToRefresh>
   );
 };

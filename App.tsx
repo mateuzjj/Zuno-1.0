@@ -26,8 +26,14 @@ const ZunoApp: React.FC = () => {
   // Handle Spotify OAuth callback
   useEffect(() => {
     const handleSpotifyCallback = async () => {
-      // Check if we're on the callback route
-      if (window.location.pathname === '/spotify/callback') {
+      // Check if we're on the callback route OR if there's a code in the URL
+      // This handles cases where the server might not rewrite the route correctly
+      const urlParams = new URLSearchParams(window.location.search);
+      const hasCode = urlParams.has('code');
+      const isCallbackPath = window.location.pathname === '/spotify/callback' || 
+                             window.location.pathname.includes('/spotify/callback');
+      
+      if (isCallbackPath || hasCode) {
         setIsProcessingCallback(true);
 
         try {
@@ -38,15 +44,22 @@ const ZunoApp: React.FC = () => {
           // Redirect to library after successful auth
           setCurrentView('library');
 
-          // Clean up URL
-          window.history.replaceState({}, document.title, '/');
-        } catch (error) {
+          // Clean up URL - remove all query params and reset path
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.search = '';
+          cleanUrl.pathname = '/';
+          window.history.replaceState({}, document.title, cleanUrl.pathname);
+        } catch (error: any) {
           console.error('Failed to process Spotify callback:', error);
-          toast.show('Erro ao conectar com Spotify', 'error');
+          const errorMsg = error?.message || 'Erro desconhecido';
+          toast.show(`Erro ao conectar com Spotify: ${errorMsg}`, 'error');
 
           // Redirect to home on error
           setCurrentView('home');
-          window.history.replaceState({}, document.title, '/');
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.search = '';
+          cleanUrl.pathname = '/';
+          window.history.replaceState({}, document.title, cleanUrl.pathname);
         } finally {
           setIsProcessingCallback(false);
         }
