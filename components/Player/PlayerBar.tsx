@@ -10,6 +10,9 @@ export const PlayerBar: React.FC = () => {
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
 
+  // Detect iOS - volume control doesn't work on iOS due to security restrictions
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+
   useEffect(() => {
     const mainElement = document.querySelector('main');
     if (!mainElement) return;
@@ -239,27 +242,36 @@ export const PlayerBar: React.FC = () => {
           <button className="text-zuno-muted hover:text-white">
             <Maximize2 size={18} />
           </button>
-          <div className="flex items-center gap-2 w-32 group">
-            <button onClick={toggleMute} className="text-zuno-muted hover:text-white">
-              {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
-            </button>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={isMuted ? 0 : volume}
-              onChange={(e) => setVolume(Number(e.target.value))}
-              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white touch-none"
-              style={{
-                background: `linear-gradient(to right, #ffffff ${volume * 100
-                  }%, #333 ${volume * 100
-                  }%)`,
-                WebkitAppearance: 'none',
-                touchAction: 'none',
-              }}
-            />
-          </div>
+          {isIOS ? (
+            <div className="flex items-center gap-2 group" title="Use os botões de volume do iPhone">
+              <Volume2 size={20} className="text-zuno-muted" />
+              <span className="text-xs text-zuno-muted whitespace-nowrap">
+                Use botões físicos
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 w-32 group">
+              <button onClick={toggleMute} className="text-zuno-muted hover:text-white">
+                {isMuted || volume === 0 ? <VolumeX size={20} /> : <Volume2 size={20} />}
+              </button>
+              <input
+                type="range"
+                min={0}
+                max={1}
+                step={0.01}
+                value={isMuted ? 0 : volume}
+                onChange={(e) => setVolume(Number(e.target.value))}
+                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white touch-none"
+                style={{
+                  background: `linear-gradient(to right, #ffffff ${volume * 100
+                    }%, #333 ${volume * 100
+                    }%)`,
+                  WebkitAppearance: 'none',
+                  touchAction: 'none',
+                }}
+              />
+            </div>
+          )}
         </div>
       </div>
     </div>
