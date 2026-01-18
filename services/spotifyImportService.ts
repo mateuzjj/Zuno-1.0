@@ -119,9 +119,28 @@ export async function importLikedSongs(
             currentItem: 'Concluído!',
         });
 
-    } catch (error) {
-        console.error('Failed to import liked songs:', error);
-        throw error;
+    } catch (error: any) {
+        console.error('[SpotifyImport] Failed to import liked songs:', error);
+        
+        // Provide more specific error messages
+        if (error?.message?.includes('Não autenticado') || error?.message?.includes('Sessão expirada')) {
+            throw new Error('Sessão do Spotify expirada. Por favor, conecte novamente.');
+        }
+        
+        if (error?.message?.includes('Muitas requisições')) {
+            throw new Error('Muitas requisições ao Spotify. Aguarde alguns minutos e tente novamente.');
+        }
+        
+        if (error?.message?.includes('conexão') || error?.message?.includes('network')) {
+            throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+        }
+        
+        // Re-throw with original message if it's already formatted
+        if (error?.message) {
+            throw error;
+        }
+        
+        throw new Error(`Erro ao importar músicas: ${error?.toString() || 'Erro desconhecido'}`);
     }
 
     return result;
@@ -202,9 +221,28 @@ export async function importFollowedArtists(
             currentItem: 'Concluído!',
         });
 
-    } catch (error) {
-        console.error('Failed to import followed artists:', error);
-        throw error;
+    } catch (error: any) {
+        console.error('[SpotifyImport] Failed to import followed artists:', error);
+        
+        // Provide more specific error messages
+        if (error?.message?.includes('Não autenticado') || error?.message?.includes('Sessão expirada')) {
+            throw new Error('Sessão do Spotify expirada. Por favor, conecte novamente.');
+        }
+        
+        if (error?.message?.includes('Muitas requisições')) {
+            throw new Error('Muitas requisições ao Spotify. Aguarde alguns minutos e tente novamente.');
+        }
+        
+        if (error?.message?.includes('conexão') || error?.message?.includes('network')) {
+            throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+        }
+        
+        // Re-throw with original message if it's already formatted
+        if (error?.message) {
+            throw error;
+        }
+        
+        throw new Error(`Erro ao importar artistas: ${error?.toString() || 'Erro desconhecido'}`);
     }
 
     return result;
@@ -381,9 +419,28 @@ export async function importPlaylists(
             currentItem: 'Concluído!',
         });
 
-    } catch (error) {
-        console.error('Failed to import playlists:', error);
-        throw error;
+    } catch (error: any) {
+        console.error('[SpotifyImport] Failed to import playlists:', error);
+        
+        // Provide more specific error messages
+        if (error?.message?.includes('Não autenticado') || error?.message?.includes('Sessão expirada')) {
+            throw new Error('Sessão do Spotify expirada. Por favor, conecte novamente.');
+        }
+        
+        if (error?.message?.includes('Muitas requisições')) {
+            throw new Error('Muitas requisições ao Spotify. Aguarde alguns minutos e tente novamente.');
+        }
+        
+        if (error?.message?.includes('conexão') || error?.message?.includes('network')) {
+            throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+        }
+        
+        // Re-throw with original message if it's already formatted
+        if (error?.message) {
+            throw error;
+        }
+        
+        throw new Error(`Erro ao importar playlists: ${error?.toString() || 'Erro desconhecido'}`);
     }
 
     return result;

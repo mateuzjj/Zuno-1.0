@@ -3,27 +3,86 @@ import { SpotifyTrack, SpotifyArtist, SpotifyAlbum, SpotifyPlaylist } from '../t
 
 const SPOTIFY_API_BASE = 'https://api.spotify.com/v1';
 
-async function fetchSpotify<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+async function fetchSpotify<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<T> {
     const token = await getAccessToken();
     if (!token) {
-        throw new Error('Not authenticated with Spotify');
+        throw new Error('Não autenticado com Spotify. Por favor, conecte novamente.');
     }
 
     const { headers, ...rest } = options;
 
-    const response = await fetch(`${SPOTIFY_API_BASE}${endpoint}`, {
-        ...rest,
-        headers: {
-            'Authorization': `Bearer ${token}`,
-            ...headers,
-        },
-    });
+    try {
+        const response = await fetch(`${SPOTIFY_API_BASE}${endpoint}`, {
+            ...rest,
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                ...headers,
+            },
+        });
 
-    if (!response.ok) {
-        throw new Error(`Spotify API error: ${response.status}`);
+        // Handle rate limiting (429)
+        if (response.status === 429) {
+            const retryAfter = response.headers.get('Retry-After');
+            const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.min(1000 * Math.pow(2, retryCount), 10000);
+            
+            if (retryCount < 3) {
+                console.warn(`[SpotifyClient] Rate limited. Waiting ${waitTime}ms before retry ${retryCount + 1}/3`);
+                await new Promise(resolve => setTimeout(resolve, waitTime));
+                return fetchSpotify<T>(endpoint, options, retryCount + 1);
+            }
+            throw new Error('Muitas requisições ao Spotify. Aguarde alguns minutos e tente novamente.');
+        }
+
+        // Handle authentication errors
+        if (response.status === 401) {
+            console.error('[SpotifyClient] 401 Unauthorized - Token may be invalid or expired');
+            throw new Error('Sessão expirada. Por favor, conecte novamente ao Spotify.');
+        }
+
+        // Handle permission errors
+        if (response.status === 403) {
+            console.error('[SpotifyClient] 403 Forbidden - Insufficient permissions');
+            throw new Error('Permissões insuficientes. Verifique as permissões da conta Spotify.');
+        }
+
+        // Handle server errors with retry
+        if (response.status >= 500 && retryCount < 2) {
+            const waitTime = 1000 * (retryCount + 1);
+            console.warn(`[SpotifyClient] Server error ${response.status}. Retrying in ${waitTime}ms...`);
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            return fetchSpotify<T>(endpoint, options, retryCount + 1);
+        }
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => '');
+            let errorMessage = `Erro na API do Spotify: ${response.status}`;
+            
+            try {
+                const errorJson = JSON.parse(errorText);
+                if (errorJson.error?.message) {
+                    errorMessage = errorJson.error.message;
+                }
+            } catch {
+                // Use default error message
+            }
+            
+            throw new Error(errorMessage);
+        }
+
+        return response.json();
+    } catch (error: any) {
+        // If it's already a formatted error, re-throw it
+        if (error.message && !error.message.includes('Spotify API error')) {
+            throw error;
+        }
+        
+        // Network errors
+        if (error.name === 'TypeError' || error.message?.includes('fetch')) {
+            throw new Error('Erro de conexão. Verifique sua internet e tente novamente.');
+        }
+        
+        throw error;
     }
-
-    return response.json();
 }
 
 /**

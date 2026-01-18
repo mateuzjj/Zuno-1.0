@@ -35,26 +35,67 @@ export const SpotifyImportModal: React.FC<SpotifyImportModalProps> = ({ isOpen, 
         setIsImporting(true);
         setStep('importing');
 
+        // Log device info for debugging
+        console.log('[SpotifyImportModal] Starting import...');
+        console.log('[SpotifyImportModal] User Agent:', navigator.userAgent);
+        console.log('[SpotifyImportModal] Platform:', navigator.platform);
+        console.log('[SpotifyImportModal] Is authenticated:', SpotifyAuth.isAuthenticated());
+
         try {
+            // Verify authentication before starting
+            if (!SpotifyAuth.isAuthenticated()) {
+                throw new Error('Não autenticado com Spotify. Por favor, conecte novamente.');
+            }
+
             const importResults: any = {
                 likedSongs: { total: 0, imported: 0, failed: [] },
                 followedArtists: { total: 0, imported: 0, failed: [] },
             };
 
             if (selectedItems.likedSongs) {
+                console.log('[SpotifyImportModal] Starting liked songs import...');
                 importResults.likedSongs = await SpotifyImportService.importLikedSongs(setProgress);
+                console.log('[SpotifyImportModal] Liked songs import completed:', importResults.likedSongs);
             }
 
             if (selectedItems.followedArtists) {
+                console.log('[SpotifyImportModal] Starting followed artists import...');
                 importResults.followedArtists = await SpotifyImportService.importFollowedArtists(setProgress);
+                console.log('[SpotifyImportModal] Followed artists import completed:', importResults.followedArtists);
             }
 
             setResults(importResults);
             setStep('complete');
             toast.show('Importação concluída!', 'success');
-        } catch (error) {
-            console.error('Import failed:', error);
-            toast.show('Erro durante a importação', 'error');
+        } catch (error: any) {
+            console.error('[SpotifyImportModal] Import failed:', error);
+            
+            // Extract meaningful error message
+            let errorMessage = 'Erro durante a importação';
+            
+            if (error?.message) {
+                errorMessage = error.message;
+            } else if (typeof error === 'string') {
+                errorMessage = error;
+            }
+            
+            // Show specific error message
+            toast.show(errorMessage, 'error');
+            
+            // Log full error for debugging (especially important for Android)
+            console.error('[SpotifyImportModal] Full error details:', {
+                message: error?.message,
+                stack: error?.stack,
+                name: error?.name,
+                toString: error?.toString(),
+                error: error
+            });
+            
+            // Log to help debug Android issues
+            if (navigator.userAgent.includes('Android')) {
+                console.error('[SpotifyImportModal] Android detected - check IndexedDB and network connectivity');
+            }
+            
             setStep('select');
         } finally {
             setIsImporting(false);

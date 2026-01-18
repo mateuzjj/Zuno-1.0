@@ -192,16 +192,14 @@ export async function loginWithSpotify(): Promise<void> {
     console.log('[SpotifyAuth] CLIENT_ID:', CLIENT_ID ? `${CLIENT_ID.substring(0, 8)}...` : 'MISSING');
     console.log('[SpotifyAuth] REDIRECT_URI:', REDIRECT_URI);
 
-    // Generate or reuse code_verifier
-    let codeVerifier = sessionStorage.getItem('spotify_code_verifier');
+    // Clear old tokens when starting a new login (important for multiple accounts)
+    console.log('[SpotifyAuth] Clearing old tokens for new login...');
+    logout();
 
-    if (!codeVerifier) {
-        codeVerifier = generateRandomString(64);
-        sessionStorage.setItem('spotify_code_verifier', codeVerifier);
-        console.log('[SpotifyAuth] Generated new code_verifier');
-    } else {
-        console.log('[SpotifyAuth] Reusing existing code_verifier');
-    }
+    // Generate new code_verifier (don't reuse for security)
+    const codeVerifier = generateRandomString(64);
+    sessionStorage.setItem('spotify_code_verifier', codeVerifier);
+    console.log('[SpotifyAuth] Generated new code_verifier');
 
     const hashed = await sha256(codeVerifier);
     const codeChallenge = base64encode(hashed);

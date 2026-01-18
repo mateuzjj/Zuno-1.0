@@ -5,7 +5,7 @@
 import http from 'http';
 import { fileURLToPath } from 'url';
 import { dirname, join, extname } from 'path';
-import { readFileSync, statSync } from 'fs';
+import { readFileSync, statSync, existsSync } from 'fs';
 import { createReadStream } from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -57,36 +57,57 @@ function serveFile(filePath, res) {
 }
 
 const server = http.createServer((req, res) => {
-  // Parse URL
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  let filePath = join(DIST_DIR, url.pathname === '/' ? 'index.html' : url.pathname);
-
-  // Try to serve the requested file
-  if (serveFile(filePath, res)) {
-    return;
-  }
-
-  // If file doesn't exist and it's not a root path, try as directory
-  if (url.pathname !== '/' && !extname(filePath)) {
-    filePath = join(filePath, 'index.html');
+  // Parse URL - handle both http and https
+  const protocol = req.headers['x-forwarded-proto'] || 'http';
+  const host = req.headers.host || 'localhost';
+  const url = new URL(req.url || '/', `${protocol}://${host}`);
+  const pathname = url.pathname;
+  
+  console.log(`[Server] Request: ${req.method} ${pathname}`);
+  
+  // Handle static assets first (JS, CSS, images, etc.)
+  if (pathname.startsWith('/assets/') || extname(pathname)) {
+    const filePath = join(DIST_DIR, pathname);
     if (serveFile(filePath, res)) {
       return;
     }
   }
-
-  // For SPA routing - serve index.html for all routes
-  // This ensures /spotify/callback and other routes work
+  
+  // For all other routes (including /spotify/callback), serve index.html
+  // This is the SPA routing - React Router will handle the routing client-side
   const indexPath = join(DIST_DIR, 'index.html');
-  if (serveFile(indexPath, res)) {
-    return;
+  
+  try {
+    if (serveFile(indexPath, res)) {
+      console.log(`[Server] Served index.html for route: ${pathname}`);
+      return;
+    }
+  } catch (error) {
+    console.error(`[Server] Error serving index.html:`, error);
   }
 
   // 404 if index.html doesn't exist
+  console.error(`[Server] 404 - index.html not found at: ${indexPath}`);
   res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('404 Not Found');
+  res.end('404 Not Found - index.html not found');
 });
 
-server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Serving files from: ${DIST_DIR}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`[Server] Server running on port ${PORT}`);
+  console.log(`[Server] Serving files from: ${DIST_DIR}`);
+  console.log(`[Server] Node version: ${process.version}`);
+  console.log(`[Server] Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Verify dist directory and index.html exist
+  try {
+    const indexPath = join(DIST_DIR, 'index.html');
+    const indexExists = existsSync(indexPath);
+    console.log(`[Server] index.html exists: ${indexExists} at ${indexPath}`);
+    
+    if (!indexExists) {
+      console.error(`[Server] WARNING: index.html not found! Build may have failed.`);
+    }
+  } catch (error) {
+    console.error(`[Server] Error checking files:`, error);
+  }
 });
