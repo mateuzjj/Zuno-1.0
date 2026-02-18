@@ -142,15 +142,22 @@ export const FullScreenPlayer: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-gradient-to-b from-black via-zuno-dark to-black backdrop-blur-3xl flex flex-col animate-in slide-in-from-bottom duration-500 h-[100dvh] overflow-hidden" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div className="fixed inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-bottom duration-500 h-[100dvh] overflow-hidden" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
 
-            {/* Background Ambience */}
+            {/* Ambient color orbs */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute rounded-full" style={{ width: '70vmax', height: '70vmax', top: '-25%', left: '-20%', background: 'radial-gradient(circle, #1ED760 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.18, animation: 'orb-drift-1 18s ease-in-out infinite alternate' }} />
+                <div className="absolute rounded-full" style={{ width: '60vmax', height: '60vmax', bottom: '-25%', right: '-15%', background: 'radial-gradient(circle, #7A4CFF 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.15, animation: 'orb-drift-2 22s ease-in-out infinite alternate' }} />
+                <div className="absolute rounded-full" style={{ width: '50vmax', height: '50vmax', top: '35%', left: '40%', background: 'radial-gradient(circle, #3B82F6 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.12, animation: 'orb-drift-3 26s ease-in-out infinite alternate' }} />
+            </div>
+
+            {/* Album cover blur */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <img
                     src={currentTrack.coverUrl}
                     className="w-full h-full object-cover opacity-20 blur-3xl scale-125"
                 />
-                <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/80 to-black/95" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/70 to-black/90" />
             </div>
 
             {/* Header */}
@@ -370,7 +377,7 @@ export const FullScreenPlayer: React.FC = () => {
 
             {/* Bottom Controls */}
             <div className="relative z-10 p-4 md:p-6 pb-safe md:pb-12 shrink-0">
-                <div className="bg-gradient-to-b from-white/10 to-black/40 backdrop-blur-3xl border border-white/10 rounded-[32px] md:rounded-[40px] p-4 md:p-8 shadow-2xl overflow-hidden relative">
+                <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] md:rounded-[40px] p-4 md:p-8 shadow-2xl overflow-hidden relative">
 
                     <div className="absolute inset-0 bg-zuno-accent/5 pointer-events-none mix-blend-overlay" />
 

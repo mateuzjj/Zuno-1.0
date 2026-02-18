@@ -45,15 +45,15 @@
           },
           colors: {
             zuno: {
-              black: '#000000', // Pure black or very deep dark
-              main: '#0A0A0A', // Main background
-              card: '#121212', // Card background
-              light: '#232323', // Lighter element
-              accent: '#1ED760', // Spotify Green
+              black: '#050505',
+              main: '#080808',
+              card: '#0f0f0f',
+              light: '#1a1a1a',
+              accent: '#1ED760',
               purple: '#7A4CFF',
               blue: '#3B82F6',
               text: '#FFFFFF',
-              muted: '#B3B3B3' // Light gray
+              muted: '#B3B3B3'
             }
           },
           borderRadius: {
@@ -69,13 +69,90 @@
   </script>
   <style>
     body {
-      background-color: #0A0A0A;
+      background-color: #050505;
       color: #FFFFFF;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
       -webkit-touch-callout: none;
       touch-action: manipulation;
-      /* iOS Safe Area Support - padding removed from body to avoid duplication with child elements */
+    }
+
+    /* ── Animated ambient background ── */
+    #zuno-ambient-bg {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    #zuno-ambient-bg .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      will-change: transform, opacity;
+    }
+    #zuno-ambient-bg .orb-1 {
+      width: 70vmax;
+      height: 70vmax;
+      top: -25%;
+      left: -20%;
+      background: radial-gradient(circle, #1ED760 0%, transparent 60%);
+      animation: orb-drift-1 18s ease-in-out infinite alternate;
+    }
+    #zuno-ambient-bg .orb-2 {
+      width: 65vmax;
+      height: 65vmax;
+      bottom: -25%;
+      right: -15%;
+      background: radial-gradient(circle, #7A4CFF 0%, transparent 60%);
+      animation: orb-drift-2 22s ease-in-out infinite alternate;
+    }
+    #zuno-ambient-bg .orb-3 {
+      width: 55vmax;
+      height: 55vmax;
+      top: 30%;
+      left: 40%;
+      background: radial-gradient(circle, #3B82F6 0%, transparent 60%);
+      animation: orb-drift-3 26s ease-in-out infinite alternate;
+    }
+
+    @keyframes orb-drift-1 {
+      0%   { transform: translate(0, 0) scale(1);   opacity: 0.55; }
+      50%  { transform: translate(12vw, 18vh) scale(1.15); opacity: 0.75; }
+      100% { transform: translate(-8vw, 8vh) scale(0.95);  opacity: 0.45; }
+    }
+    @keyframes orb-drift-2 {
+      0%   { transform: translate(0, 0) scale(1);   opacity: 0.50; }
+      50%  { transform: translate(-14vw, -12vh) scale(1.1); opacity: 0.70; }
+      100% { transform: translate(6vw, -6vh) scale(1.05);  opacity: 0.40; }
+    }
+    @keyframes orb-drift-3 {
+      0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.35; }
+      50%  { transform: translate(-40%, -60%) scale(1.2);  opacity: 0.60; }
+      100% { transform: translate(-55%, -45%) scale(0.9);  opacity: 0.35; }
+    }
+
+    /* Transparent overlay for content areas */
+    .zuno-bg-main-transparent {
+      background-color: rgba(5, 5, 5, 0.50) !important;
+    }
+    .zuno-bg-card-transparent {
+      background-color: rgba(10, 10, 10, 0.55) !important;
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+    }
+    .zuno-bg-sidebar-transparent {
+      background-color: rgba(5, 5, 5, 0.45) !important;
+      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(20px);
+    }
+
+    #root {
+      position: relative;
+      z-index: 1;
+      background: transparent !important;
+      min-height: 100vh;
+      min-height: 100dvh;
     }
 
     /* Prevent zoom on input focus (iOS) */
@@ -97,16 +174,16 @@
     }
 
     ::-webkit-scrollbar-track {
-      background: #0A0A0A;
+      background: transparent;
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #232323;
+      background: #1a1a1a;
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #333;
+      background: #2a2a2a;
     }
 
     .hide-scrollbar::-webkit-scrollbar {
@@ -279,6 +356,12 @@
 </head>
 
 <body>
+  <!-- Fundo animado com orbes de cor -->
+  <div id="zuno-ambient-bg" aria-hidden="true">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
   <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

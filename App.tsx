@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ChevronUp } from 'lucide-react';
 import { PlayerProvider } from './store/PlayerContext';
 import { Sidebar } from './components/Layout/Sidebar';
 import { MobileNav } from './components/Layout/MobileNav';
@@ -8,6 +9,7 @@ import { Home } from './pages/Home';
 import { Search } from './pages/Search';
 import { Library } from './pages/Library';
 import { LikedSongs } from './pages/LikedSongs';
+import { LikedAlbums } from './pages/LikedAlbums';
 import { PlaylistPage } from './pages/Playlist';
 import { Logo } from './components/UI/Logo';
 import { View } from './types';
@@ -22,6 +24,18 @@ const ZunoApp: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('home');
   const [viewId, setViewId] = useState<string | null>(null);
   const [isProcessingCallback, setIsProcessingCallback] = useState(false);
+  const [showScrollTop, setShowScrollTop] = useState(false);
+  const mainRef = useRef<HTMLElement | null>(null);
+
+  const handleMainScroll = useCallback(() => {
+    const el = mainRef.current;
+    if (!el) return;
+    setShowScrollTop(el.scrollTop > 600);
+  }, []);
+
+  const scrollToTop = useCallback(() => {
+    mainRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   // Handle Spotify OAuth callback
   useEffect(() => {
@@ -86,6 +100,7 @@ const ZunoApp: React.FC = () => {
   const handleNavigate = (view: View, id?: string) => {
     if (id) setViewId(id);
     setCurrentView(view);
+    mainRef.current?.scrollTo({ top: 0 });
   };
 
   const renderView = () => {
@@ -94,6 +109,7 @@ const ZunoApp: React.FC = () => {
       case 'search': return <Search onNavigate={handleNavigate} />;
       case 'library': return <Library onNavigate={handleNavigate} />;
       case 'likedSongs': return <LikedSongs />;
+      case 'likedAlbums': return <LikedAlbums onNavigate={handleNavigate} />;
       case 'playlist': return viewId ? <PlaylistPage playlistId={viewId} onBack={() => setCurrentView('library')} /> : null;
       case 'artist': return viewId ? <ArtistPage artistId={viewId} onNavigate={handleNavigate} /> : <div className="text-white p-8">No Artist Selected</div>;
       case 'album': return viewId ? <AlbumPage albumId={viewId} onBack={() => setCurrentView('home')} /> : null;
@@ -103,7 +119,7 @@ const ZunoApp: React.FC = () => {
 
   return (
     <div 
-      className="flex min-h-screen bg-zuno-black text-zuno-text font-sans selection:bg-zuno-accent selection:text-zuno-black"
+      className="flex min-h-screen text-zuno-text font-sans selection:bg-zuno-accent selection:text-zuno-black relative z-[1]"
       style={{ minHeight: '100dvh' }}
     >
       {/* Show loading state during Spotify callback processing */}
@@ -119,11 +135,22 @@ const ZunoApp: React.FC = () => {
           <Sidebar currentView={currentView} setView={setCurrentView} />
 
           {/* Main Content Area */}
-          <main className="flex-1 md:ml-64 overflow-y-auto h-screen bg-zuno-main scroll-smooth safe-top player-content-padding">
-
-
+          <main
+            ref={mainRef}
+            onScroll={handleMainScroll}
+            className="flex-1 md:ml-64 overflow-y-auto h-screen zuno-bg-main-transparent scroll-smooth safe-top player-content-padding"
+          >
             {renderView()}
           </main>
+
+          {/* Scroll to top */}
+          <button
+            onClick={scrollToTop}
+            aria-label="Voltar ao topo"
+            className={`fixed z-50 right-5 bottom-36 md:bottom-24 p-3 rounded-full zuno-bg-card-transparent border border-white/10 backdrop-blur-xl shadow-lg shadow-black/30 text-white transition-all duration-300 hover:scale-110 active:scale-95 ${showScrollTop ? 'opacity-100 translate-y-0 pointer-events-auto' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+          >
+            <ChevronUp size={22} strokeWidth={2.5} />
+          </button>
 
           <PlayerBar />
           <FullScreenPlayer />

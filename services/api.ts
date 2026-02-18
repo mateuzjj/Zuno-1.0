@@ -146,15 +146,28 @@ function getCoverUrl(id: string | undefined, size = '640'): string {
 function mapApiTrackToTrack(item: any, fallbackArtistName?: string): Track {
   const albumCover = item.album?.cover || item.cover || '';
   const artistName = item.artist?.name || fallbackArtistName || 'Unknown Artist';
+  // Save numeric IDs for recommendation endpoints (/artist/similar/, /album/similar/)
+  const artistId = item.artist?.id?.toString() ||
+    (Array.isArray(item.artists) && item.artists[0]?.id?.toString()) ||
+    undefined;
+  const albumId = item.album?.id?.toString() || undefined;
 
   return {
     id: item.id?.toString(),
     title: item.title,
     artist: artistName,
+    artistId,
     album: item.album?.title || 'Unknown Album',
+    albumId,
     coverUrl: getCoverUrl(albumCover, '320'),
     duration: item.duration,
-    streamUrl: '' // Fetched on demand via getStreamUrl
+    streamUrl: '', // Fetched on demand via getStreamUrl
+    // Required recommendation fields — defaults (Tidal API doesn't provide these)
+    genre: [],
+    bpm: 0,
+    energy: 0.5,
+    valence: 0.5,
+    popularity: 0
   };
 }
 
@@ -165,19 +178,19 @@ async function getFeaturedAlbumsHelper(): Promise<Album[]> {
       'New Releases', 'Top Albums', 'Trending', 'Hits',
       'Best of', 'Classics', 'Essential'
     ];
-    
+
     const randomQuery = queries[Math.floor(Math.random() * queries.length)];
-    
+
     // Add timeout to prevent infinite loading
-    const timeoutPromise = new Promise<never>((_, reject) => 
+    const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Album search timeout')), 5000)
     );
-    
+
     const response = await Promise.race([
       fetchWithRetry(`/search/?al=${encodeURIComponent(randomQuery)}&limit=12`),
       timeoutPromise
     ]);
-    
+
     const data = await response.json();
     const normalized = normalizeSearchResponse(data, 'albums');
 
@@ -212,7 +225,7 @@ async function getFeaturedAlbumsHelper(): Promise<Album[]> {
         return true;
       })
       .slice(0, 12);
-    
+
     return albums.length > 0 ? albums : MOCK_ALBUMS;
   } catch (error) {
     console.warn("Failed to get featured albums, using mocks", error);
@@ -221,25 +234,24 @@ async function getFeaturedAlbumsHelper(): Promise<Album[]> {
 }
 
 // Helper function to get featured playlists (defined before api object)
-async function getFeaturedPlaylistsHelper(): Promise<Playlist[]> {
+async function getFeaturedPlaylistsHelper(): Promise<{ playlists: Playlist[], query: string }> {
+  const queries = [
+    'Top 50', 'Viral', 'Trending', 'New Music', 'Hits',
+    'Chill', 'Workout', 'Focus', 'Party', 'Relax',
+    'Summer', 'Classics', 'Indie', 'Hip Hop', 'Electronic'
+  ];
+  const randomQuery = queries[Math.floor(Math.random() * queries.length)];
+
   try {
-    const queries = [
-      'Top 50', 'Viral', 'Trending', 'New Music', 'Hits',
-      'Chill', 'Workout', 'Focus', 'Party', 'Relax'
-    ];
-    
-    const randomQuery = queries[Math.floor(Math.random() * queries.length)];
-    
-    // Add timeout to prevent infinite loading
-    const timeoutPromise = new Promise<never>((_, reject) => 
+    const timeoutPromise = new Promise<never>((_, reject) =>
       setTimeout(() => reject(new Error('Playlist search timeout')), 5000)
     );
-    
+
     const response = await Promise.race([
       fetchWithRetry(`/search/?pl=${encodeURIComponent(randomQuery)}&limit=12`),
       timeoutPromise
     ]);
-    
+
     const data = await response.json();
     const normalized = normalizeSearchResponse(data, 'playlists');
 
@@ -260,28 +272,31 @@ async function getFeaturedPlaylistsHelper(): Promise<Playlist[]> {
         return true;
       })
       .slice(0, 12);
-    
-    return playlists.length > 0 ? playlists : MOCK_PLAYLISTS;
+
+    return {
+      playlists: playlists.length > 0 ? playlists : MOCK_PLAYLISTS,
+      query: randomQuery
+    };
   } catch (error) {
     console.warn("Failed to get featured playlists, using mocks", error);
-    return MOCK_PLAYLISTS;
+    return { playlists: MOCK_PLAYLISTS, query: randomQuery };
   }
 }
 
 export const api = {
   // Enhanced Home Data with real API calls
-  getFeatured: async (): Promise<{ albums: Album[], playlists: Playlist[], recent: Track[] }> => {
+  getFeatured: async (): Promise<{ albums: Album[], playlists: Playlist[], recent: Track[], playlistSectionTitle: string }> => {
     try {
       // Add timeout to prevent infinite loading
-      const timeoutPromise = new Promise<{ albums: Album[], playlists: Playlist[], recent: Track[] }>((_, reject) => 
+      const timeoutPromise = new Promise<{ albums: Album[], playlists: Playlist[], recent: Track[], playlistSectionTitle: string }>((_, reject) =>
         setTimeout(() => reject(new Error('getFeatured timeout')), 10000)
       );
 
       const featuredPromise = (async () => {
         // Try to get real data from API using helper functions
-        const [albums, playlists] = await Promise.all([
+        const [albums, playlistResult] = await Promise.all([
           getFeaturedAlbumsHelper().catch(() => MOCK_ALBUMS),
-          getFeaturedPlaylistsHelper().catch(() => MOCK_PLAYLISTS)
+          getFeaturedPlaylistsHelper().catch(() => ({ playlists: MOCK_PLAYLISTS, query: 'Destaque' }))
         ]);
 
         // Get recent tracks from personalized feed with timeout
@@ -290,12 +305,17 @@ export const api = {
             .then(m => m.ZunoAPI.getNextFeedSection(0))
             .then(section => section.tracks.slice(0, 3))
             .catch(() => MOCK_TRACKS.slice(0, 3)),
-          new Promise<Track[]>((_, reject) => 
+          new Promise<Track[]>((_, reject) =>
             setTimeout(() => reject(new Error('Recent tracks timeout')), 5000)
           )
         ]).catch(() => MOCK_TRACKS.slice(0, 3));
 
-        return { albums, playlists, recent };
+        return {
+          albums,
+          playlists: playlistResult.playlists,
+          recent,
+          playlistSectionTitle: `Playlists: ${playlistResult.query}`
+        };
       })();
 
       return await Promise.race([featuredPromise, timeoutPromise]);
@@ -304,7 +324,8 @@ export const api = {
       return {
         albums: MOCK_ALBUMS,
         playlists: MOCK_PLAYLISTS,
-        recent: MOCK_TRACKS.slice(0, 3)
+        recent: MOCK_TRACKS.slice(0, 3),
+        playlistSectionTitle: 'Playlists em Destaque'
       };
     }
   },
@@ -366,13 +387,13 @@ export const api = {
   searchArtists: async (query: string, limit: number = 6, offset: number = 0): Promise<{ items: any[], total: number }> => {
     try {
       // Add timeout to prevent long waits
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Artist search timeout')), 6000)
       );
 
       const searchPromise = fetchWithRetry(`/search/?a=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
       const response = await Promise.race([searchPromise, timeoutPromise]);
-      
+
       const data = await response.json();
       const normalized = normalizeSearchResponse(data, 'artists');
 
@@ -389,7 +410,7 @@ export const api = {
       };
     } catch (error) {
       console.warn("Artist search failed", error);
-      return [];
+      return { items: [], total: 0 };
     }
   },
 
@@ -397,13 +418,13 @@ export const api = {
   searchAlbums: async (query: string, limit: number = 6, offset: number = 0): Promise<{ items: any[], total: number }> => {
     try {
       // Add timeout to prevent long waits
-      const timeoutPromise = new Promise<never>((_, reject) => 
+      const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Album search timeout')), 6000)
       );
 
       const searchPromise = fetchWithRetry(`/search/?al=${encodeURIComponent(query)}&limit=${limit}&offset=${offset}`);
       const response = await Promise.race([searchPromise, timeoutPromise]);
-      
+
       const data = await response.json();
       const normalized = normalizeSearchResponse(data, 'albums');
 
@@ -448,7 +469,7 @@ export const api = {
       };
     } catch (error) {
       console.warn("Album search failed", error);
-      return [];
+      return { items: [], total: 0 };
     }
   },
 
@@ -650,7 +671,7 @@ export const api = {
       };
     } catch (error) {
       console.warn("Playlist search failed", error);
-      return [];
+      return { items: [], total: 0 };
     }
   },
 
@@ -692,11 +713,212 @@ export const api = {
 
   // Get Featured/Recommended Playlists (using search with popular queries)
   getFeaturedPlaylists: async (): Promise<Playlist[]> => {
-    return getFeaturedPlaylistsHelper();
+    const result = await getFeaturedPlaylistsHelper();
+    return result.playlists;
   },
 
   // Get Featured Albums (using search with popular queries)
   getFeaturedAlbums: async (): Promise<Album[]> => {
     return getFeaturedAlbumsHelper();
+  },
+
+  // ─── Recommendation Endpoints (from Monochrome) ───────────────────────────
+
+  /**
+   * Fetches artists similar to a given artist (alinhado ao Monochrome).
+   * Uses Tidal's /artist/similar/?id= endpoint.
+   * @param artistId — numeric Tidal artist ID (stored in Track.artistId)
+   */
+  getSimilarArtists: async (artistId: string): Promise<any[]> => {
+    try {
+      const response = await fetchWithRetry(`/artist/similar/?id=${artistId}`);
+      const data = await response.json();
+      // Mesma ordem do Monochrome + suporte a resposta aninhada (data.data.artists)
+      const raw: any[] =
+        data.artists ||
+        data.items ||
+        (data.data && (Array.isArray(data.data) ? data.data : data.data.artists || data.data.items)) ||
+        (Array.isArray(data) ? data : []);
+      // Só artistas: têm "name"; excluir álbuns (numberOfTracks / title sem name)
+      const artistItems = raw.filter(
+        (a: any) =>
+          a &&
+          typeof (a.name ?? a.artist?.name) === 'string' &&
+          (a.name ?? a.artist?.name).trim() !== '' &&
+          !('numberOfTracks' in a)
+      );
+      // prepareArtist-style: artistTypes → type (Monochrome)
+      const mapped = artistItems.map((a: any) => {
+        const name = (a.name ?? a.artist?.name ?? '').trim();
+        const type = a.type ?? (Array.isArray(a.artistTypes) && a.artistTypes.length > 0 ? a.artistTypes[0] : undefined);
+        const id = (a.id ?? a.artist?.id)?.toString();
+        return { id, name, picture: getArtistPictureUrl(a.picture ?? a.cover ?? a.coverUrl, '320'), type };
+      });
+      return mapped.filter((a) => a.id && a.name);
+    } catch (e) {
+      console.warn('[getSimilarArtists] failed:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Fetches albums similar to a given album.
+   * Uses Tidal's /album/similar/ endpoint.
+   * @param albumId — numeric Tidal album ID (stored in Track.albumId)
+   */
+  getSimilarAlbums: async (albumId: string): Promise<any[]> => {
+    try {
+      const response = await fetchWithRetry(`/album/similar/?id=${albumId}`);
+      const data = await response.json();
+      const items: any[] = data.items || data.albums || data.data || (Array.isArray(data) ? data : []);
+      return items.map((a: any) => ({
+        id: a.id?.toString(),
+        title: a.title,
+        artist: a.artist?.name || 'Unknown',
+        coverUrl: getCoverUrl(a.cover)
+      }));
+    } catch (e) {
+      console.warn('[getSimilarAlbums] failed:', e);
+      return [];
+    }
+  },
+
+  /**
+   * Fetches a Tidal Mix (algorithmically curated playlist).
+   * Uses Tidal's /mix/ endpoint.
+   * @param mixId — Tidal Mix ID (e.g. from a known mix)
+   */
+  getMix: async (mixId: string): Promise<{ mix: any; tracks: Track[] }> => {
+    try {
+      const response = await fetchWithRetry(`/mix/?id=${mixId}`);
+      const data = await response.json();
+      const mixData = data.mix;
+      const items: any[] = data.items || [];
+      if (!mixData) throw new Error('Mix metadata not found');
+      const tracks = items.map((i: any) => mapApiTrackToTrack(i.item || i));
+      const mix = {
+        id: mixData.id,
+        title: mixData.title,
+        subTitle: mixData.subTitle,
+        description: mixData.description,
+        mixType: mixData.mixType,
+        cover: mixData.images?.LARGE?.url || mixData.images?.MEDIUM?.url || mixData.images?.SMALL?.url || null
+      };
+      return { mix, tracks };
+    } catch (e) {
+      console.warn('[getMix] failed:', e);
+      return { mix: null, tracks: [] };
+    }
+  },
+
+  /**
+   * Fetches top tracks from artists similar to those in the user's history.
+   * Core of the "Similar Artist Discovery" feed strategy.
+   * @param artistIds — array of numeric Tidal artist IDs
+   * @param excludeIds — track IDs already shown (to avoid repeats)
+   * @param limit — max tracks to return
+   */
+  getTracksFromSimilarArtists: async (
+    artistIds: string[],
+    excludeIds: string[] = [],
+    limit = 20
+  ): Promise<Track[]> => {
+    if (artistIds.length === 0) return [];
+    const seenIds = new Set(excludeIds);
+    const result: Track[] = [];
+
+    // Pick up to 3 random artist IDs to avoid too many requests
+    const sample = artistIds.sort(() => Math.random() - 0.5).slice(0, 3);
+
+    await Promise.all(sample.map(async (artistId) => {
+      try {
+        // 1. Get similar artists
+        const similar = await api.getSimilarArtists(artistId);
+        if (similar.length === 0) return;
+
+        // 2. Pick one random similar artist
+        const pick = similar[Math.floor(Math.random() * similar.length)];
+        if (!pick?.id) return;
+
+        // 3. Search tracks by that artist
+        const tracks = await api.search(pick.name, 10);
+        const fresh = tracks.filter(t => !seenIds.has(t.id));
+        fresh.forEach(t => { seenIds.add(t.id); result.push(t); });
+      } catch (e) {
+        console.warn('[getTracksFromSimilarArtists] artist fetch failed:', e);
+      }
+    }));
+
+    return result.sort(() => Math.random() - 0.5).slice(0, limit);
+  },
+
+  /**
+   * Recommended tracks from seed tracks (Monochrome-style).
+   * Extracts artist IDs from seeds → getArtist(id) → collect that artist's tracks.
+   * If fewer than 3 artists from seeds, tries search to get full metadata (artistId).
+   * @param tracks — seed tracks (e.g. from history); must have artistId when possible
+   * @param limit — max tracks to return
+   */
+  getRecommendedTracksForPlaylist: async (tracks: Track[], limit = 20): Promise<Track[]> => {
+    let artistIds = [...new Set(tracks.filter(t => t.artistId).map(t => t.artistId as string))];
+
+    if (artistIds.length < 3) {
+      for (const track of tracks.slice(0, 5)) {
+        if (artistIds.length >= 5) break;
+        try {
+          const query = `"${track.title}" ${track.artist || ''}`.trim();
+          const searchResults = await api.search(query, 5);
+          const first = searchResults[0];
+          if (first?.artistId && !artistIds.includes(first.artistId)) {
+            artistIds.push(first.artistId);
+          }
+        } catch (e) {
+          console.warn('[getRecommendedTracksForPlaylist] search fallback failed:', e);
+        }
+      }
+    }
+
+    if (artistIds.length === 0) return [];
+
+    const seenTrackIds = new Set(tracks.map(t => t.id));
+    const recommended: Track[] = [];
+    const artistsToProcess = artistIds.slice(0, 5);
+
+    for (const artistId of artistsToProcess) {
+      try {
+        const artistData = await api.getArtist(artistId);
+        if (artistData?.tracks?.length) {
+          const newTracks = artistData.tracks
+            .filter(t => !seenTrackIds.has(t.id))
+            .slice(0, 4);
+          newTracks.forEach(t => {
+            seenTrackIds.add(t.id);
+            recommended.push(t);
+          });
+        }
+      } catch (e) {
+        console.warn('[getRecommendedTracksForPlaylist] getArtist failed for', artistId, e);
+      }
+    }
+
+    return recommended.sort(() => Math.random() - 0.5).slice(0, limit);
+  },
+
+  /**
+   * Fetches top tracks for a specific artist.
+   * Uses Tidal's /artist/toptracks/ endpoint.
+   * @param artistId — numeric Tidal artist ID
+   * @param limit — max tracks to return
+   */
+  getArtistTopTracks: async (artistId: string, limit = 10): Promise<Track[]> => {
+    try {
+      const response = await fetchWithRetry(`/artist/toptracks/?id=${artistId}&limit=${limit}`);
+      const data = await response.json();
+      const items: any[] = data.items || data.tracks || data.data || (Array.isArray(data) ? data : []);
+      return items.map((i: any) => mapApiTrackToTrack(i.item || i)).slice(0, limit);
+    } catch (e) {
+      console.warn('[getArtistTopTracks] failed:', e);
+      return [];
+    }
   }
 };

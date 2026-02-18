@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Search as SearchIcon, X, User, Disc, Music2, Play, MoreVertical, CheckCircle2 } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Search as SearchIcon, X, User, Disc, Music2, Play, MoreVertical, CheckCircle2, Clock } from 'lucide-react';
 import { View, Track, Album, Artist, Playlist } from '../types';
 import { api } from '../services/api';
+import { ZunoAPI } from '../services/zunoApi';
 import { usePlayer } from '../store/PlayerContext';
 
 interface SearchProps {
@@ -36,7 +37,12 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
     artists: false,
     playlists: false
   });
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => ZunoAPI.getRecentSearches());
   const { playTrack } = usePlayer();
+
+  const refreshRecentSearches = useCallback(() => {
+    setRecentSearches(ZunoAPI.getRecentSearches());
+  }, []);
 
   const handleSearch = async (searchQuery: string) => {
     if (!searchQuery.trim()) {
@@ -50,6 +56,10 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
     }
 
     const normalizedQuery = searchQuery.trim().toLowerCase();
+    if (normalizedQuery.length >= 3) {
+      ZunoAPI.saveSearch(searchQuery.trim());
+      setRecentSearches(ZunoAPI.getRecentSearches());
+    }
 
     // Check cache first
     const cached = searchCache.get(normalizedQuery);
@@ -388,6 +398,40 @@ export const Search: React.FC<SearchProps> = ({ onNavigate }) => {
           </button>
         )}
       </div>
+
+      {/* Histórico de pesquisa — exibido quando o campo está vazio */}
+      {!query.trim() && recentSearches.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-bold text-white flex items-center gap-2">
+              <Clock size={18} className="text-zuno-muted" />
+              Histórico de pesquisa
+            </h2>
+            <button
+              type="button"
+              onClick={() => {
+                ZunoAPI.clearSearchHistory();
+                refreshRecentSearches();
+              }}
+              className="text-xs text-zuno-muted hover:text-white transition-colors"
+            >
+              Limpar
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {recentSearches.map((term) => (
+              <button
+                key={term}
+                type="button"
+                onClick={() => setQuery(term)}
+                className="px-4 py-2 rounded-full bg-white/10 text-white text-sm hover:bg-white/20 transition-colors truncate max-w-[200px]"
+              >
+                {term}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter Buttons */}
       {query && (tracks.length > 0 || artists.length > 0 || albums.length > 0 || playlists.length > 0) && (

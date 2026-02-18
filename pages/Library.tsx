@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Heart, Music, Plus, Play, Download } from 'lucide-react';
+import { Heart, Music, Plus, Play, Download, Disc3 } from 'lucide-react';
 import { Playlist } from '../types';
 import { PlaylistService } from '../services/playlistService';
+import { LikedAlbumsService } from '../services/likedAlbumsService';
 import { CreatePlaylistModal } from '../components/UI/CreatePlaylistModal';
 import { SpotifyImportModal } from '../components/UI/SpotifyImportModal';
 import { View } from '../types';
@@ -12,19 +13,21 @@ interface LibraryProps {
 
 export const Library: React.FC<LibraryProps> = ({ onNavigate }) => {
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
+  const [likedAlbumsCount, setLikedAlbumsCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isSpotifyImportOpen, setIsSpotifyImportOpen] = useState(false);
 
   useEffect(() => {
     loadPlaylists();
+    setLikedAlbumsCount(LikedAlbumsService.getLikedAlbumsCount());
   }, []);
 
   const loadPlaylists = async () => {
     setLoading(true);
     try {
       const pls = await PlaylistService.getPlaylists();
-      setPlaylists(pls.reverse()); // Most recent first
+      setPlaylists(pls.reverse());
     } catch (error) {
       console.error('Failed to load playlists:', error);
     } finally {
@@ -59,6 +62,20 @@ export const Library: React.FC<LibraryProps> = ({ onNavigate }) => {
           <div>
             <h3 className="text-lg font-bold text-white">Músicas Curtidas</h3>
             <p className="text-sm text-white/80">Todas as suas favoritas</p>
+          </div>
+        </div>
+
+        {/* Liked Albums Card */}
+        <div
+          onClick={() => onNavigate('likedAlbums')}
+          className="flex items-center gap-4 bg-gradient-to-br from-blue-600 to-cyan-600 p-4 rounded-lg cursor-pointer hover:from-blue-500 hover:to-cyan-500 transition-all group"
+        >
+          <div className="w-16 h-16 bg-white/20 rounded-lg flex items-center justify-center">
+            <Disc3 size={32} className="text-white" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-white">Álbuns Curtidos</h3>
+            <p className="text-sm text-white/80">{likedAlbumsCount} {likedAlbumsCount === 1 ? 'álbum' : 'álbuns'} salvos</p>
           </div>
         </div>
 

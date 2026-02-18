@@ -51,7 +51,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({ currentView, setView }) =>
           right: 'calc(1rem + env(safe-area-inset-right))'
         }}
       >
-        <div className="bg-zuno-card/98 backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl shadow-black/50 px-2 py-2.5 flex items-center justify-around">
+        <div className="zuno-bg-card-transparent backdrop-blur-2xl border border-white/10 rounded-3xl shadow-2xl shadow-black/40 px-2 py-2.5 flex items-center justify-around">
           {navItems.map((item) => {
             const isActive = currentView === item.id;
             const Icon = item.icon;

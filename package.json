@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:tunnel": "set TUNNEL=1 && vite",
+    "tunnel": "npx localtunnel --port 3002 --subdomain zuno",
     "build": "vite build",
     "preview": "vite preview"
   },

@@ -69,7 +69,7 @@ export const ZunoAPI = {
 
     /**
      * Generates PERSONALIZED Home Feed Sections.
-     * No more generic 'Workout' or 'Rainy' playlists.
+     * Uses Tidal's /artist/similar/ endpoint for real discovery.
      */
     getNextFeedSection: async (offset: number, excludeIds: string[] = []) => {
         // Helper to mix and clean tracks
@@ -83,19 +83,39 @@ export const ZunoAPI = {
         let section: { title: string, subtitle: string, tracks: Track[] };
 
         try {
-            // STRATEGY 1: "Made For You" (Based on User's Top Artists)
-            // Occurs frequently
+            // STRATEGY 1: "Artistas Similares" (Similar Artist Discovery via Tidal API)
+            // Uses /artist/similar/ to find real similar artists based on listening history
             if (offset % 3 === 0) {
                 const history = ZunoAPI.getValidHistory();
                 if (history.length > 0) {
-                    // Get most frequented artist
+                    // Collect unique artist IDs from history
+                    const artistIds = [...new Set(
+                        history
+                            .filter(t => t.artistId)
+                            .map(t => t.artistId as string)
+                    )].slice(0, 5);
+
+                    if (artistIds.length > 0) {
+                        // Use real Tidal /artist/similar/ endpoint
+                        const similarTracks = await api.getTracksFromSimilarArtists(artistIds, excludeIds, 20);
+
+                        if (similarTracks.length >= 5) {
+                            const processed = await processTracks(similarTracks);
+                            // Get the artist name for the section title
+                            const topArtist = history[0].artist;
+                            return {
+                                title: `Descobertas Similares`,
+                                subtitle: `Baseado em ${topArtist} e outros que você ouve`,
+                                tracks: processed.slice(0, 15)
+                            };
+                        }
+                    }
+
+                    // Fallback: text-based artist mix if no artistIds saved yet
                     const artistCounts: Record<string, number> = {};
                     history.forEach(t => {
-                        const artist = t.artist;
-                        artistCounts[artist] = (artistCounts[artist] || 0) + 1;
+                        artistCounts[t.artist] = (artistCounts[t.artist] || 0) + 1;
                     });
-
-                    // Get a random top artist (not always #1 to vary the feed)
                     const topArtists = Object.entries(artistCounts)
                         .sort((a, b) => b[1] - a[1])
                         .slice(0, 5)
@@ -103,19 +123,11 @@ export const ZunoAPI = {
 
                     if (topArtists.length > 0) {
                         const selectedArtist = topArtists[Math.floor(Math.random() * topArtists.length)];
-
-                        // 1. Get tracks by the main artist
                         const mainTracks = await api.search(selectedArtist);
-
-                        // 2. Get "Similar Artists" to create a real mix
-                        // We use the collaborative engine to find a "seed" track's similar tracks
                         const seedTrack = history.find(t => t.artist === selectedArtist) || history[0];
                         const similarTracks = await getCollaborativeRecommendations(seedTrack.id);
-
-                        // 3. Mix them: 40% Main Artist, 60% Discovery/Similar
                         const combined = [...mainTracks.slice(0, 5), ...similarTracks];
                         const processed = await processTracks(combined);
-
                         return {
                             title: `Mix de ${selectedArtist}`,
                             subtitle: `Com ${selectedArtist} e similares`,
@@ -125,14 +137,45 @@ export const ZunoAPI = {
                 }
             }
 
-            // STRATEGY 2: "Jump Back In" (Based on LAST played Song)
+            // STRATEGY 2: "Porque você ouviu X" (Based on last played track's similar artists)
             if (offset % 3 === 1) {
                 const history = ZunoAPI.getValidHistory();
                 if (history.length > 0) {
                     const lastTrack = history[0];
+
+                    // Try real similar artists first if we have an artistId
+                    if (lastTrack.artistId) {
+                        try {
+                            const similarArtists = await api.getSimilarArtists(lastTrack.artistId);
+                            if (similarArtists.length > 0) {
+                                // Pick 2 random similar artists and search their tracks
+                                const picks = similarArtists
+                                    .sort(() => Math.random() - 0.5)
+                                    .slice(0, 2);
+
+                                const trackArrays = await Promise.all(
+                                    picks.map(a => api.search(a.name, 8).catch(() => []))
+                                );
+                                const combined = trackArrays.flat().filter(t => !excludeIds.includes(t.id));
+                                const processed = await processTracks(combined);
+
+                                if (processed.length >= 5) {
+                                    const similarNames = picks.map(a => a.name).join(', ');
+                                    return {
+                                        title: `Porque você ouviu ${lastTrack.artist}`,
+                                        subtitle: `Com ${similarNames} e mais`,
+                                        tracks: processed.slice(0, 15)
+                                    };
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Strategy 2] Similar artists failed, using fallback:', e);
+                        }
+                    }
+
+                    // Fallback to collaborative recommendations
                     const recs = await getCollaborativeRecommendations(lastTrack.id);
                     const processed = await processTracks(recs);
-
                     return {
                         title: `Porque você ouviu ${lastTrack.artist}`,
                         subtitle: `${lastTrack.title} e similares`,
@@ -141,11 +184,37 @@ export const ZunoAPI = {
                 }
             }
 
-            // STRATEGY 3: "Daily Discovery" (Deep Dive based on taste profile)
-            // Uses profile vector to find new stuff
+            // STRATEGY 3: "Descobertas da Semana" (Daily Discovery based on taste profile)
             if (offset % 3 === 2) {
+                const history = ZunoAPI.getValidHistory();
                 const profile = await ZunoAPI.getUserProfile();
-                // Determine vibe from profile
+
+                // Try similar artists from a random history track
+                if (history.length > 0) {
+                    const tracksWithIds = history.filter(t => t.artistId);
+                    if (tracksWithIds.length > 0) {
+                        const randomTrack = tracksWithIds[Math.floor(Math.random() * tracksWithIds.length)];
+                        try {
+                            const similar = await api.getSimilarArtists(randomTrack.artistId!);
+                            if (similar.length > 0) {
+                                const pick = similar[Math.floor(Math.random() * similar.length)];
+                                const tracks = await api.search(pick.name, 15);
+                                const processed = await processTracks(tracks);
+                                if (processed.length >= 5) {
+                                    return {
+                                        title: 'Descobertas da Semana',
+                                        subtitle: `Artistas como ${randomTrack.artist}`,
+                                        tracks: processed.slice(0, 15)
+                                    };
+                                }
+                            }
+                        } catch (e) {
+                            console.warn('[Strategy 3] Similar artist discovery failed:', e);
+                        }
+                    }
+                }
+
+                // Fallback: keyword-based discovery
                 let query = 'hits';
                 if (profile.energy > 0.7) query = 'club hits';
                 else if (profile.energy < 0.4) query = 'chill relaxing';
@@ -154,7 +223,6 @@ export const ZunoAPI = {
 
                 const results = await api.search(query);
                 const processed = await processTracks(results);
-
                 return {
                     title: 'Descobertas da Semana',
                     subtitle: 'Sugestões novas para seu perfil',
@@ -162,8 +230,7 @@ export const ZunoAPI = {
                 };
             }
 
-            // FALLBACK if no history (New User)
-            // Enhanced variety for new users
+            // FALLBACK for new users (no history)
             const queries = [
                 'Top 50 Global', 'Viral Hits', 'New Music Friday',
                 'Rock Classics', 'Jazz Vibes', 'Lo-Fi Beats',
@@ -171,15 +238,9 @@ export const ZunoAPI = {
                 'Indie Discoveries', 'Latin Hits', 'K-Pop Risers',
                 'Piano Ballads', 'Movie Soundtracks', 'Acoustic Covers'
             ];
-
-            // Random selection to ensure variety every time
             const q = queries[Math.floor(Math.random() * queries.length)];
-
             const res = await api.search(q);
-
-            // Ensure we don't just show the same 5 artists if the API returns them
-            // Shuffle and filter duplicates by artist in the fallback
-            const seenArtists = new Set();
+            const seenArtists = new Set<string>();
             const diverseTracks = res.filter(t => {
                 if (seenArtists.has(t.artist)) return false;
                 seenArtists.add(t.artist);
@@ -194,7 +255,6 @@ export const ZunoAPI = {
 
         } catch (error) {
             console.error('Feed generation error:', error);
-            // Minimal fallback
             const fallback = await api.search('mix');
             return {
                 title: 'Explorar',
@@ -214,9 +274,10 @@ export const ZunoAPI = {
 
     /**
      * Records a play in history.
+     * Now also saves artistId for /artist/similar/ lookups.
      */
     recordPlay: (track: Track, secondsPlayed: number) => {
-        if (secondsPlayed < 10) return; // Lower threshold to learn faster
+        if (secondsPlayed < 10) return;
 
         const history = JSON.parse(localStorage.getItem('zuno_history') || '[]');
         const newHistory = [track, ...history.filter((t: Track) => t.id !== track.id)].slice(0, 50);
@@ -234,6 +295,10 @@ export const ZunoAPI = {
         return JSON.parse(localStorage.getItem('zuno_search_history') || '[]');
     },
 
+    clearSearchHistory: (): void => {
+        localStorage.setItem('zuno_search_history', '[]');
+    },
+
     getValidHistory: (): Track[] => {
         return JSON.parse(localStorage.getItem('zuno_history') || '[]');
     },
@@ -248,9 +313,13 @@ export const ZunoAPI = {
 
     // New Search Passthroughs
     searchArtists: async (query: string) => {
-      const result = await api.searchArtists(query);
-      return Array.isArray(result) ? result : result.items;
+        const result = await api.searchArtists(query);
+        return Array.isArray(result) ? result : result.items;
     },
     getArtist: (id: string) => api.getArtist(id),
-    getAlbum: (id: string) => api.getAlbum(id)
+    getAlbum: (id: string) => api.getAlbum(id),
+    getSimilarArtists: (artistId: string) => api.getSimilarArtists(artistId),
+    getSimilarAlbums: (albumId: string) => api.getSimilarAlbums(albumId),
+    getMix: (mixId: string) => api.getMix(mixId)
 };
+

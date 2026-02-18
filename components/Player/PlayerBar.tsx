@@ -51,7 +51,7 @@ export const PlayerBar: React.FC = () => {
 
   return (
     <div
-      className={`fixed left-2 right-2 md:left-8 md:right-8 bg-zuno-card/98 border border-white/10 p-3 md:p-4 z-50 rounded-3xl backdrop-blur-2xl shadow-2xl shadow-black/50 transition-all duration-300 player-bar-bottom ${isVisible ? 'translate-y-0' : 'translate-y-[200%] md:translate-y-0'}`}
+      className={`fixed left-2 right-2 md:left-8 md:right-8 zuno-bg-card-transparent border border-white/10 p-3 md:p-4 z-50 rounded-3xl backdrop-blur-2xl shadow-2xl shadow-black/40 transition-all duration-300 player-bar-bottom ${isVisible ? 'translate-y-0' : 'translate-y-[200%] md:translate-y-0'}`}
       style={{
         bottom: 'calc(6.5rem + env(safe-area-inset-bottom))',
         left: 'calc(0.5rem + env(safe-area-inset-left))',

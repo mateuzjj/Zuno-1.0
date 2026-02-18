@@ -16,7 +16,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
   ];
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-zuno-main h-screen p-6 gap-8 fixed left-0 top-0 z-40 border-r border-white/5">
+    <aside className="hidden md:flex flex-col w-64 zuno-bg-sidebar-transparent h-screen p-6 gap-8 fixed left-0 top-0 z-40 border-r border-white/5">
       {/* Brand */}
       <div className="mb-4 pl-1 cursor-pointer group" onClick={() => setView('home')}>
         <Logo className="h-8 text-white group-hover:text-zuno-accent transition-colors duration-500" />

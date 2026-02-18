@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Playlist, Track, Artist } from '../types';
+import { Playlist, Track, Album, Artist } from '../types';
 
 // Database Schema
 interface ZunoDB extends DBSchema {
@@ -11,6 +11,11 @@ interface ZunoDB extends DBSchema {
     likedTracks: {
         key: string;
         value: { track: Track; likedAt: number };
+        indexes: { 'by-likedAt': number };
+    };
+    likedAlbums: {
+        key: string;
+        value: { album: Album; likedAt: number };
         indexes: { 'by-likedAt': number };
     };
     followedArtists: {
@@ -39,7 +44,7 @@ interface ZunoDB extends DBSchema {
         indexes: { 'by-timestamp': number };
     };
     downloadedTracks: {
-        key: string; // track.id
+        key: string;
         value: {
             track: Track;
             audioBlob: Blob;
@@ -52,19 +57,16 @@ interface ZunoDB extends DBSchema {
 }
 
 const DB_NAME = 'ZunoMusicDB';
-const DB_VERSION = 4; // Incremented to add downloadedTracks store
+const DB_VERSION = 5;
 
 let dbInstance: IDBPDatabase<ZunoDB> | null = null;
+let dbPromise: Promise<IDBPDatabase<ZunoDB>> | null = null;
 
-/**
- * Initialize and get the IndexedDB instance
- */
-export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
-    if (dbInstance) {
-        return dbInstance;
-    }
-
-    dbInstance = await openDB<ZunoDB>(DB_NAME, DB_VERSION, {
+function createDB(): Promise<IDBPDatabase<ZunoDB>> {
+    return openDB<ZunoDB>(DB_NAME, DB_VERSION, {
+        blocked() {
+            console.warn('[DB] Upgrade blocked — closing stale connections');
+        },
         upgrade(db, oldVersion, newVersion, transaction) {
             // Create playlists store
             if (!db.objectStoreNames.contains('playlists')) {
@@ -78,6 +80,12 @@ export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
                 likedStore.createIndex('by-likedAt', 'likedAt');
             }
 
+            // Create likedAlbums store (kept for schema consistency, data stored in localStorage)
+            if (!db.objectStoreNames.contains('likedAlbums')) {
+                const likedAlbumsStore = db.createObjectStore('likedAlbums', { keyPath: 'album.id' });
+                likedAlbumsStore.createIndex('by-likedAt', 'likedAt');
+            }
+
             // Create followedArtists store
             if (!db.objectStoreNames.contains('followedArtists')) {
                 const followStore = db.createObjectStore('followedArtists', { keyPath: 'artist.id' });
@@ -89,7 +97,6 @@ export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
                 const lyricsStore = db.createObjectStore('lyricsCache', { keyPath: 'trackId' });
                 lyricsStore.createIndex('by-timestamp', 'timestamp');
             } else if (oldVersion < 3) {
-                // Clear lyrics cache if upgrading to v3 (start fresh with new logic)
                 transaction.objectStore('lyricsCache').clear();
                 console.log('[DB] Cleared lyrics cache for version upgrade');
             }
@@ -107,13 +114,53 @@ export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
             }
         },
     });
-
-    return dbInstance;
 }
 
-/**
- * Close the database connection
- */
+function deleteDB(): Promise<void> {
+    return new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase(DB_NAME);
+        req.onsuccess = () => resolve();
+        req.onerror = () => resolve();
+        req.onblocked = () => resolve();
+    });
+}
+
+function verifyStores(db: IDBPDatabase<ZunoDB>): boolean {
+    const required = ['playlists', 'likedTracks', 'followedArtists', 'lyricsCache', 'downloadedTracks'];
+    return required.every(s => db.objectStoreNames.contains(s));
+}
+
+export async function getDB(): Promise<IDBPDatabase<ZunoDB>> {
+    if (dbInstance) return dbInstance;
+    if (dbPromise) return dbPromise;
+
+    const doOpen = async (): Promise<IDBPDatabase<ZunoDB>> => {
+        try {
+            let db = await createDB();
+            if (!verifyStores(db)) {
+                console.warn('[DB] Missing stores, recreating database...');
+                db.close();
+                await deleteDB();
+                db = await createDB();
+            }
+            dbInstance = db;
+            return db;
+        } catch (err) {
+            console.error('[DB] Failed to open, resetting database...', err);
+            dbInstance = null;
+            await deleteDB();
+            const db = await createDB();
+            dbInstance = db;
+            return db;
+        } finally {
+            dbPromise = null;
+        }
+    };
+
+    dbPromise = doOpen();
+    return dbPromise;
+}
+
 export function closeDB(): void {
     if (dbInstance) {
         dbInstance.close();

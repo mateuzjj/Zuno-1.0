@@ -497,25 +497,28 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return;
     }
 
-    // Check if track is already liked
     import('../services/likedSongsService').then(({ LikedSongsService }) => {
       LikedSongsService.isTrackLiked(currentTrack.id).then(liked => {
         setIsLiked(liked);
-      });
-    });
+      }).catch(() => setIsLiked(false));
+    }).catch(() => setIsLiked(false));
   }, [currentTrack]);
 
   const toggleLike = async () => {
     if (!currentTrack) return;
 
-    const { LikedSongsService } = await import('../services/likedSongsService');
+    try {
+      const { LikedSongsService } = await import('../services/likedSongsService');
 
-    if (isLiked) {
-      await LikedSongsService.unlikeTrack(currentTrack.id);
-      setIsLiked(false);
-    } else {
-      await LikedSongsService.likeTrack(currentTrack);
-      setIsLiked(true);
+      if (isLiked) {
+        await LikedSongsService.unlikeTrack(currentTrack.id);
+        setIsLiked(false);
+      } else {
+        await LikedSongsService.likeTrack(currentTrack);
+        setIsLiked(true);
+      }
+    } catch (err) {
+      console.error('[Player] toggleLike failed:', err);
     }
   };
 

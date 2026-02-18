@@ -1,9 +1,8 @@
+/* Não usa overflow próprio — o scroll é no main para o menu/player ocultarem ao rolar */
 .pull-to-refresh-container {
   position: relative;
-  height: 100%;
-  overflow-y: auto;
+  min-height: 100%;
   overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
   user-select: none;
   -webkit-user-select: none;
 }

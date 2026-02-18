@@ -2,7 +2,9 @@ export interface Track {
   id: string;
   title: string;
   artist: string;
+  artistId?: string; // Tidal numeric artist ID — used for /artist/similar/ endpoint
   album: string;
+  albumId?: string; // Tidal numeric album ID — used for /album/similar/ endpoint
   coverUrl: string;
   duration: number; // seconds
   streamUrl?: string; // Optional because it is fetched on demand
@@ -38,6 +40,12 @@ export interface Artist {
   name: string;
   picture: string;
   type?: string;
+}
+
+export interface RecommendedArtist {
+  id: string;
+  name: string;
+  picture: string;
 }
 
 export interface Album {
@@ -80,7 +88,7 @@ export interface PlayerState {
   repeatMode: RepeatMode;
 }
 
-export type View = 'home' | 'search' | 'library' | 'artist' | 'album' | 'playlist' | 'likedSongs';
+export type View = 'home' | 'search' | 'library' | 'artist' | 'album' | 'playlist' | 'likedSongs' | 'likedAlbums';
 
 // Lyrics Types
 export interface LyricsLine {

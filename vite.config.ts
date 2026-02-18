@@ -11,10 +11,11 @@ export default defineConfig(({ mode }) => {
   const certPath = './.certs/localhost-cert.pem';
   const keyPath = './.certs/localhost-key.pem';
 
+  const isTunnel = !!env.TUNNEL;
   let httpsConfig = undefined;
-  if (isDev) {
+  if (isDev && !isTunnel) {
     try {
-      // Only use HTTPS if certificate files exist
+      // Only use HTTPS if certificate files exist (skip when using tunnel)
       if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
         httpsConfig = {
           key: fs.readFileSync(keyPath),
@@ -30,6 +31,7 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3002,
       host: '0.0.0.0', // Allow network access
+      allowedHosts: true,
       https: httpsConfig,
       proxy: {
         '/api/lyrics': {

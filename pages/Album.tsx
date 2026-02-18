@@ -1,9 +1,20 @@
-import React, { useEffect, useState } from 'react';
-import { Play, Sparkles, Clock, Calendar, ArrowLeft, Download, CheckCircle2 } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Play, Sparkles, Calendar, ArrowLeft, Download, CheckCircle2, Disc3, Heart } from 'lucide-react';
 import { ZunoAPI } from '../services/zunoApi';
+import { api } from '../services/api';
 import { DownloadService } from '../services/download';
+import { LikedAlbumsService } from '../services/likedAlbumsService';
 import { Album, Track } from '../types';
 import { usePlayer } from '../store/PlayerContext';
+import { toast } from '../components/UI/Toast';
+
+const PLACEHOLDER = 'https://picsum.photos/seed/album/640/640';
+
+function resolveCover(url: string | undefined): string {
+    if (!url) return PLACEHOLDER;
+    if (/^https?:\/\//i.test(url)) return url;
+    return api.getCoverUrl(url);
+}
 
 interface AlbumPageProps {
     albumId: string;
@@ -16,6 +27,7 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
     const [tracks, setTracks] = useState<Track[]>([]);
     const [loading, setLoading] = useState(true);
     const [downloadedTrackIds, setDownloadedTrackIds] = useState<Set<string>>(new Set());
+    const [isLiked, setIsLiked] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
@@ -24,8 +36,8 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                 const data = await ZunoAPI.getAlbum(albumId);
                 setAlbum(data.album);
                 setTracks(data.tracks);
-                // Refresh download status when album is loaded
-                await checkDownloadedTracks();
+                checkDownloadedTracks().catch(() => {});
+                setIsLiked(LikedAlbumsService.isAlbumLiked(albumId));
             } catch (err) {
                 console.error("Failed to load album", err);
             } finally {
@@ -37,6 +49,21 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
             loadData();
         }
     }, [albumId]);
+
+    const handleToggleLike = useCallback(() => {
+        if (!album || !album.id) return;
+        const fullAlbum: Album = {
+            id: album.id,
+            title: album.title || '',
+            artist: album.artist || '',
+            coverUrl: album.coverUrl || '',
+            year: album.year,
+            releaseDate: album.releaseDate,
+        };
+        const nowLiked = LikedAlbumsService.toggleAlbumLike(fullAlbum);
+        setIsLiked(nowLiked);
+        toast.show(nowLiked ? 'Álbum salvo nos favoritos' : 'Álbum removido dos favoritos', 'success');
+    }, [album]);
 
     const checkDownloadedTracks = async () => {
         try {
@@ -59,58 +86,89 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
 
     if (!album) return <div className="text-white p-8">Album not found</div>;
 
-    return (
-        <div className="text-white pb-20">
-            {/* Back Button */}
-            <button onClick={onBack} className="absolute top-6 left-6 z-20 p-2 bg-black/40 rounded-full hover:bg-black/60 transition-colors backdrop-blur-md">
-                <ArrowLeft size={20} />
-            </button>
+    const cover = resolveCover(album.coverUrl);
 
-            {/* Hero Header */}
-            <div className="relative h-96 flex items-end p-8 bg-gradient-to-b from-gray-800 to-zuno-main -mx-4 md:-mx-8 -mt-6 mb-8 group">
+    return (
+        <div className="text-white pb-20 overflow-x-hidden">
+            {/* Back */}
+            <div className="px-4 md:px-8 pt-4">
+                <button
+                    onClick={onBack}
+                    className="relative z-20 p-2.5 rounded-full bg-black/40 hover:bg-black/60 transition-colors backdrop-blur-md border border-white/10"
+                    aria-label="Voltar"
+                >
+                    <ArrowLeft size={20} />
+                </button>
+            </div>
+
+            {/* Hero — sem margens negativas para não gerar scroll lateral */}
+            <div className="relative mx-4 md:mx-8 mt-4 mb-8 rounded-2xl overflow-hidden bg-gradient-to-b from-zuno-card to-zuno-main flex items-center justify-center py-8 px-6 md:px-8">
                 <div className="absolute inset-0 opacity-40">
                     <img
-                        src={album.coverUrl}
-                        alt={album.title}
+                        src={cover}
+                        alt=""
                         className="w-full h-full object-cover blur-3xl scale-110"
+                        onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
                     />
                 </div>
-                <div className="absolute inset-0 bg-black/20" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
 
-                <div className="relative z-10 flex flex-col md:flex-row gap-8 items-end w-full">
-                    <img
-                        src={album.coverUrl}
-                        alt={album.title}
-                        className="w-48 h-48 md:w-64 md:h-64 object-cover rounded-2xl shadow-2xl shadow-black/50"
-                    />
-                    <div className="flex-1">
-                        <span className="text-sm font-bold uppercase tracking-widest text-zuno-accent mb-2 block">Album</span>
-                        <h1 className="text-4xl md:text-7xl font-bold mb-4 drop-shadow-xl">{album.title}</h1>
-                        <div className="flex items-center gap-2 text-gray-300 font-medium text-lg">
-                            <span>{album.artist}</span>
-                            <span className="w-1 h-1 bg-gray-400 rounded-full" />
-                            <span className="flex items-center gap-1"><Calendar size={16} /> {album.year || (album.releaseDate ? new Date(album.releaseDate).getFullYear() : 'Unknown')}</span>
+                <div className="relative z-10 flex flex-col items-center w-full gap-4">
+                    {/* Capa — centralizada */}
+                    <div className="w-44 h-44 md:w-56 md:h-56 flex-shrink-0 rounded-2xl overflow-hidden shadow-2xl shadow-black/50 bg-zuno-card">
+                        <img
+                            src={cover}
+                            alt={album.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).src = PLACEHOLDER; }}
+                        />
+                    </div>
+
+                    {/* Info — centralizado */}
+                    <div className="w-full text-center min-w-0">
+                        <span className="text-xs font-bold uppercase tracking-widest text-zuno-accent mb-1 block">Álbum</span>
+                        <h1 className="text-2xl md:text-4xl font-bold mb-2 drop-shadow-lg truncate px-2">{album.title}</h1>
+                        <div className="flex flex-wrap items-center gap-2 text-zuno-muted text-sm justify-center">
+                            <span className="text-white font-medium">{album.artist}</span>
+                            <span className="w-1 h-1 bg-white/40 rounded-full" />
+                            <span className="flex items-center gap-1">
+                                <Calendar size={14} />
+                                {album.year || (album.releaseDate ? new Date(album.releaseDate).getFullYear() : '—')}
+                            </span>
+                            <span className="w-1 h-1 bg-white/40 rounded-full" />
+                            <span>{tracks.length} {tracks.length === 1 ? 'faixa' : 'faixas'}</span>
                         </div>
                     </div>
 
-                    <button
-                        onClick={() => tracks.length > 0 && playTrack(tracks[0], tracks)}
-                        className="bg-zuno-accent text-black w-14 h-14 rounded-full flex items-center justify-center hover:scale-110 transition-transform shadow-lg shadow-green-500/30"
-                    >
-                        <Play fill="currentColor" size={24} className="ml-1" />
-                    </button>
-                    <button
-                        onClick={() => album.title && DownloadService.downloadAlbum(album.title, tracks)}
-                        className="bg-white/10 text-white w-14 h-14 rounded-full flex items-center justify-center hover:scale-110 hover:bg-white/20 transition-all backdrop-blur-md border border-white/10"
-                        title="Download Album"
-                    >
-                        <Download size={24} />
-                    </button>
+                    {/* Actions — centralizado */}
+                    <div className="flex gap-3">
+                        <button
+                            onClick={() => tracks.length > 0 && playTrack(tracks[0], tracks)}
+                            className="bg-zuno-accent text-black w-14 h-14 rounded-full flex items-center justify-center hover:scale-105 transition-transform shadow-lg shadow-zuno-accent/30"
+                            title="Reproduzir"
+                        >
+                            <Play fill="currentColor" size={24} className="ml-0.5" />
+                        </button>
+                        <button
+                            onClick={handleToggleLike}
+                            className={`w-14 h-14 rounded-full flex items-center justify-center hover:scale-105 transition-all backdrop-blur-md border border-white/10 ${isLiked ? 'bg-red-500/20 text-red-500' : 'bg-white/10 text-white hover:bg-white/20'}`}
+                            title={isLiked ? 'Remover dos favoritos' : 'Salvar nos favoritos'}
+                        >
+                            <Heart size={22} fill={isLiked ? 'currentColor' : 'none'} />
+                        </button>
+                        <button
+                            onClick={() => album.title && DownloadService.downloadAlbum(album.title, tracks)}
+                            className="bg-white/10 text-white w-14 h-14 rounded-full flex items-center justify-center hover:scale-105 hover:bg-white/20 transition-all backdrop-blur-md border border-white/10"
+                            title="Baixar Álbum (ZIP)"
+                        >
+                            <Download size={22} />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div className="px-4">
-                {/* Tracklist */}
+            {/* Tracklist */}
+            <div className="px-4 md:px-8">
                 <div className="space-y-1">
                     {tracks.map((track, idx) => (
                         <div
@@ -119,9 +177,9 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                             className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group cursor-pointer transition-colors border-b border-white/5 last:border-0"
                         >
                             <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
-                                    <h4 className="font-medium text-white group-hover:text-zuno-accent transition-colors text-lg">{track.title}</h4>
+                                    <h4 className="font-medium text-white group-hover:text-zuno-accent transition-colors text-lg truncate">{track.title}</h4>
                                     {downloadedTrackIds.has(track.id) && (
                                         <CheckCircle2
                                             size={16}
@@ -131,15 +189,15 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                                         />
                                     )}
                                 </div>
-                                <p className="text-sm text-gray-400">{track.artist}</p>
+                                <p className="text-sm text-gray-400 truncate">{track.artist}</p>
                             </div>
-                            <span className="text-sm text-gray-500 font-mono">
+                            <span className="text-sm text-gray-500 font-mono flex-shrink-0">
                                 {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
                             </span>
                         </div>
                     ))}
                 </div>
             </div>
-        </div >
+        </div>
     );
 };
