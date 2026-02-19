@@ -1,17 +1,24 @@
 import { MOCK_ALBUMS, MOCK_PLAYLISTS, MOCK_TRACKS } from "../constants";
 import { Album, Playlist, Track } from "../types";
 
-// API Instances provided in reference
-// Prioritize know working instances
+// API Instances — Monochrome first (referência: monochrome/public/instances.json)
+// Para Mix retornar playlist real (vários artistas), priorizar instâncias que devolvem data.items
 const API_INSTANCES = [
+  "https://eu-central.monochrome.tf",
+  "https://us-west.monochrome.tf",
+  "https://arran.monochrome.tf",
+  "https://api.monochrome.tf",
+  "https://triton.squid.wtf",
   "https://wolf.qqdl.site",
   "https://tidal-api.binimum.org",
-  "https://triton.squid.wtf",
+  "https://monochrome-api.samidy.com",
   "https://maus.qqdl.site",
   "https://vogel.qqdl.site",
   "https://katze.qqdl.site",
   "https://hund.qqdl.site",
-  "https://tidal.kinoplus.online"
+  "https://tidal.kinoplus.online",
+  "https://hifi-one.spotisaver.net",
+  "https://hifi-two.spotisaver.net"
 ];
 
 const RATE_LIMIT_ERROR_MESSAGE = 'Too Many Requests. Please wait a moment and try again.';
@@ -142,15 +149,25 @@ function getCoverUrl(id: string | undefined, size = '640'): string {
   return `https://resources.tidal.com/images/${formattedId}/${size}x${size}.jpg`;
 }
 
-// Mapper: Converts Raw API Track to ZUNO Track
+// Mapper: Converts Raw API Track to ZUNO Track (Monochrome: prepareTrack usa artist ou artists[0])
 function mapApiTrackToTrack(item: any, fallbackArtistName?: string): Track {
   const albumCover = item.album?.cover || item.cover || '';
-  const artistName = item.artist?.name || fallbackArtistName || 'Unknown Artist';
+  let artistName: string = 'Unknown Artist';
+  if (item.artist?.name) artistName = item.artist.name;
+  else if (Array.isArray(item.artists) && item.artists.length > 0)
+    artistName = typeof item.artists[0] === 'string' ? item.artists[0] : (item.artists[0]?.name ?? 'Unknown Artist');
+  else if (typeof item.artist === 'string') artistName = item.artist;
+  else if (item.artistName) artistName = item.artistName;
+  else if (fallbackArtistName) artistName = fallbackArtistName;
   // Save numeric IDs for recommendation endpoints (/artist/similar/, /album/similar/)
   const artistId = item.artist?.id?.toString() ||
     (Array.isArray(item.artists) && item.artists[0]?.id?.toString()) ||
     undefined;
   const albumId = item.album?.id?.toString() || undefined;
+
+  const mixes = item.mixes?.TRACK_MIX
+    ? { TRACK_MIX: item.mixes.TRACK_MIX }
+    : undefined;
 
   return {
     id: item.id?.toString(),
@@ -162,12 +179,12 @@ function mapApiTrackToTrack(item: any, fallbackArtistName?: string): Track {
     coverUrl: getCoverUrl(albumCover, '320'),
     duration: item.duration,
     streamUrl: '', // Fetched on demand via getStreamUrl
-    // Required recommendation fields — defaults (Tidal API doesn't provide these)
     genre: [],
     bpm: 0,
     energy: 0.5,
     valence: 0.5,
-    popularity: 0
+    popularity: 0,
+    mixes
   };
 }
 
@@ -785,17 +802,51 @@ export const api = {
 
   /**
    * Fetches a Tidal Mix (algorithmically curated playlist).
-   * Uses Tidal's /mix/ endpoint.
+   * Uses Tidal's /mix/ endpoint. Tries multiple response shapes (items, tracks, tracks.items, mix.items).
    * @param mixId — Tidal Mix ID (e.g. from a known mix)
    */
   getMix: async (mixId: string): Promise<{ mix: any; tracks: Track[] }> => {
-    try {
-      const response = await fetchWithRetry(`/mix/?id=${mixId}`);
-      const data = await response.json();
-      const mixData = data.mix;
-      const items: any[] = data.items || [];
-      if (!mixData) throw new Error('Mix metadata not found');
-      const tracks = items.map((i: any) => mapApiTrackToTrack(i.item || i));
+    const isTrackLike = (x: any): boolean =>
+      x && typeof x === 'object' && (x.type === 'track' || x.title != null || x.item?.title != null || (x.item && typeof x.item === 'object'));
+
+    const findTrackArray = (obj: any, visited = new Set<any>()): any[] | null => {
+      if (!obj || visited.has(obj)) return null;
+      if (Array.isArray(obj)) {
+        if (obj.length > 0 && isTrackLike(obj[0])) return obj;
+        for (const el of obj) {
+          const found = findTrackArray(el, visited);
+          if (found?.length) return found;
+        }
+        return null;
+      }
+      visited.add(obj);
+      if (typeof obj === 'object') {
+        for (const v of Object.values(obj)) {
+          const found = findTrackArray(v, visited);
+          if (found?.length) return found;
+        }
+      }
+      return null;
+    };
+
+    const parseMixResponse = (jsonData: any): { mix: any; rawItems: any[] } => {
+      const data = jsonData.data || jsonData;
+      const mixData = data.mix || data;
+      if (!mixData || !mixData.id) throw new Error('Mix metadata not found');
+      let rawItems: any[] = [];
+      if (Array.isArray(data.items)) rawItems = data.items;
+      else if (Array.isArray(data.tracks)) rawItems = data.tracks;
+      else if (data.tracks?.items && Array.isArray(data.tracks.items)) rawItems = data.tracks.items;
+      else if (mixData.items && Array.isArray(mixData.items)) rawItems = mixData.items;
+      else if (mixData.tracks && Array.isArray(mixData.tracks)) rawItems = mixData.tracks;
+      else if (mixData.tracks?.items && Array.isArray(mixData.tracks.items)) rawItems = mixData.tracks.items;
+      else if (data.data && Array.isArray(data.data)) rawItems = data.data;
+      else if (data.included && Array.isArray(data.included)) rawItems = data.included.filter((x: any) => x.type === 'track' || x.album || x.title);
+      else if (data.relationships?.items?.data && Array.isArray(data.relationships.items.data)) rawItems = data.relationships.items.data;
+      if (rawItems.length === 0) {
+        const found = findTrackArray(jsonData);
+        if (found?.length) rawItems = found;
+      }
       const mix = {
         id: mixData.id,
         title: mixData.title,
@@ -804,6 +855,69 @@ export const api = {
         mixType: mixData.mixType,
         cover: mixData.images?.LARGE?.url || mixData.images?.MEDIUM?.url || mixData.images?.SMALL?.url || null
       };
+      return { mix, rawItems };
+    };
+
+    const DEBUG_MIX = typeof window !== 'undefined' && (window as any).__ZUNO_DEBUG_MIX__;
+
+    function logMixResponseSummary(label: string, obj: any, depth = 0) {
+      if (depth > 4) return;
+      const keys = obj && typeof obj === 'object' && !Array.isArray(obj) ? Object.keys(obj) : [];
+      const summary = keys.length ? keys.map((k) => {
+        const v = (obj as any)[k];
+        if (Array.isArray(v)) return `${k}: [${v.length}]`;
+        if (v && typeof v === 'object') return `${k}: {${Object.keys(v).join(', ')}}`;
+        return `${k}: ${typeof v}`;
+      }).join(', ') : String(obj);
+      console.warn(`[getMix] ${label}`, summary);
+      if (DEBUG_MIX && obj && typeof obj === 'object' && depth < 2) {
+        console.warn('[getMix] raw (truncado):', JSON.stringify(obj).slice(0, 2000));
+      }
+    }
+
+    try {
+      const url = `/mix/?id=${encodeURIComponent(mixId)}`;
+      const response = await fetchWithRetry(url);
+      const jsonData = await response.json();
+      if (DEBUG_MIX) {
+        console.log('[getMix] raw response keys:', Object.keys(jsonData));
+        if (jsonData.data) console.log('[getMix] data keys:', Object.keys(jsonData.data));
+        if (jsonData.mix) console.log('[getMix] mix keys:', Object.keys(jsonData.mix));
+      }
+      const { mix, rawItems } = parseMixResponse(jsonData);
+      let tracks = rawItems.map((i: any) => mapApiTrackToTrack(i.item || i));
+
+      if (tracks.length === 0) {
+        logMixResponseSummary('0 faixas — estrutura da resposta:', jsonData);
+        if (!DEBUG_MIX) console.warn('[getMix] Para ver o JSON completo: window.__ZUNO_DEBUG_MIX__ = true e abra o Mix de novo.');
+        try {
+          const res2 = await fetchWithRetry(`${url}&limit=500`);
+          const json2 = await res2.json();
+          const parsed = parseMixResponse(json2);
+          const extra = parsed.rawItems.map((i: any) => mapApiTrackToTrack(i.item || i));
+          if (extra.length > 0) tracks = extra;
+        } catch (_) { /* ignorar */ }
+        if (tracks.length === 0) {
+          const altUrls = [
+            `/mix/items/?id=${encodeURIComponent(mixId)}`,
+            `/mix/tracks/?id=${encodeURIComponent(mixId)}`,
+            `/mixes/${encodeURIComponent(mixId)}/items`
+          ];
+          for (const altUrl of altUrls) {
+            try {
+              const resAlt = await fetchWithRetry(altUrl);
+              const jsonAlt = await resAlt.json();
+              const arr = Array.isArray(jsonAlt) ? jsonAlt : (jsonAlt.items ?? jsonAlt.tracks ?? jsonAlt.data ?? []);
+              const list = Array.isArray(arr) ? arr : [];
+              const extra = list.map((i: any) => mapApiTrackToTrack(i.item || i)).filter((t: Track) => t?.id);
+              if (extra.length > 0) {
+                tracks = extra;
+                break;
+              }
+            } catch (_) { /* próxima URL */ }
+          }
+        }
+      }
       return { mix, tracks };
     } catch (e) {
       console.warn('[getMix] failed:', e);
@@ -920,5 +1034,36 @@ export const api = {
       console.warn('[getArtistTopTracks] failed:', e);
       return [];
     }
+  },
+
+  /**
+   * Retorna as mesmas faixas que o Radio usaria para uma faixa (artista → álbuns → faixas).
+   * Usado quando o Mix retorna 0 faixas do provedor: preenche a página com o "Radio do artista".
+   */
+  getRadioTracksForTrack: async (track: Track): Promise<Track[]> => {
+    const CHUNK = 3;
+    let artistId: string | undefined = track.artistId;
+    if (!artistId && track.artist) {
+      const { items } = await api.searchArtists(track.artist, 1);
+      artistId = items[0]?.id;
+    }
+    if (!artistId) return [];
+    const { albums } = await api.getArtist(artistId);
+    if (!albums?.length) return [];
+    const trackSet = new Set<string>();
+    const allTracks: Track[] = [];
+    for (let i = 0; i < albums.length; i += CHUNK) {
+      const chunk = albums.slice(i, i + CHUNK);
+      const results = await Promise.all(
+        chunk.map((a) => api.getAlbum(a.id).then((r) => r.tracks).catch(() => []))
+      );
+      results.flat().forEach((t) => {
+        if (!trackSet.has(t.id)) {
+          trackSet.add(t.id);
+          allTracks.push(t);
+        }
+      });
+    }
+    return allTracks;
   }
 };

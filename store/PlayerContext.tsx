@@ -1,7 +1,19 @@
-import React, { createContext, useContext, useState, useRef, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useRef, useEffect, useCallback, ReactNode } from 'react';
 import { PlayerState, PlayerStatus, Track, RepeatMode, Lyrics } from '../types';
 import { api } from '../services/api';
 import { LyricsService } from '../services/lyricsService';
+import { toast } from '../components/UI/Toast';
+
+const RADIO_CHUNK_SIZE = 3;
+
+function shuffleTracks(arr: Track[]): Track[] {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
 
 interface PlayerContextType extends PlayerState {
   isExpanded: boolean;
@@ -20,6 +32,8 @@ interface PlayerContextType extends PlayerState {
   cycleRepeatMode: () => void;
   isLiked: boolean;
   toggleLike: () => void;
+  radioLoading: boolean;
+  startRadioFromTrack: (track: Track) => Promise<void>;
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -522,6 +536,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  const [radioLoading, setRadioLoading] = useState(false);
+
   const playTrack = async (track: Track, newQueue?: Track[]) => {
     console.log('[Player] playTrack called:', {
       trackTitle: track.title,
@@ -557,6 +573,52 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     await playTrackInternal(track);
   };
+
+  const startRadioFromTrack = useCallback(async (track: Track) => {
+    setRadioLoading(true);
+    try {
+      let artistId: string | undefined = track.artistId;
+      if (!artistId && track.artist) {
+        const { items } = await api.searchArtists(track.artist, 1);
+        artistId = items[0]?.id;
+      }
+      if (!artistId) {
+        toast.show('Não foi possível identificar o artista.', 'info');
+        return;
+      }
+      const { artist, albums } = await api.getArtist(artistId);
+      if (!albums?.length) {
+        toast.show('Nenhum álbum encontrado para este artista.', 'info');
+        return;
+      }
+      const trackSet = new Set<string>();
+      const allTracks: Track[] = [];
+      for (let i = 0; i < albums.length; i += RADIO_CHUNK_SIZE) {
+        const chunk = albums.slice(i, i + RADIO_CHUNK_SIZE);
+        const results = await Promise.all(
+          chunk.map((a) => api.getAlbum(a.id).then((r) => r.tracks).catch(() => []))
+        );
+        results.flat().forEach((t) => {
+          if (!trackSet.has(t.id)) {
+            trackSet.add(t.id);
+            allTracks.push(t);
+          }
+        });
+      }
+      if (allTracks.length === 0) {
+        toast.show('Nenhuma faixa encontrada.', 'info');
+        return;
+      }
+      const shuffled = shuffleTracks(allTracks);
+      playTrack(shuffled[0], shuffled);
+      toast.show(`Radio: ${shuffled.length} faixas de ${artist.name}`, 'success');
+    } catch (e) {
+      console.error('[Player] startRadioFromTrack failed:', e);
+      toast.show('Não foi possível iniciar o rádio.', 'error');
+    } finally {
+      setRadioLoading(false);
+    }
+  }, [playTrack]);
 
   const togglePlay = () => {
     if (!audioRef.current || !currentTrack) return;
@@ -743,7 +805,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       toggleShuffle,
       cycleRepeatMode,
       isLiked,
-      toggleLike
+      toggleLike,
+      radioLoading,
+      startRadioFromTrack
     }}>
       {children}
     </PlayerContext.Provider>

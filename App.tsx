@@ -16,6 +16,7 @@ import { View } from './types';
 
 import { ArtistPage } from './pages/Artist';
 import { AlbumPage } from './pages/Album';
+import { MixPage } from './pages/Mix';
 import { ToastContainer, toast } from './components/UI/Toast';
 import { SpotifyAuth } from './services/spotifyAuth';
 
@@ -97,8 +98,10 @@ const ZunoApp: React.FC = () => {
     return () => clearTimeout(timeoutId);
   }, []);
 
-  const handleNavigate = (view: View, id?: string) => {
+  const [navigateState, setNavigateState] = useState<Record<string, unknown>>({});
+  const handleNavigate = (view: View, id?: string, state?: Record<string, unknown>) => {
     if (id) setViewId(id);
+    if (state) setNavigateState((prev) => ({ ...prev, [view]: state }));
     setCurrentView(view);
     mainRef.current?.scrollTo({ top: 0 });
   };
@@ -113,6 +116,7 @@ const ZunoApp: React.FC = () => {
       case 'playlist': return viewId ? <PlaylistPage playlistId={viewId} onBack={() => setCurrentView('library')} /> : null;
       case 'artist': return viewId ? <ArtistPage artistId={viewId} onNavigate={handleNavigate} /> : <div className="text-white p-8">No Artist Selected</div>;
       case 'album': return viewId ? <AlbumPage albumId={viewId} onBack={() => setCurrentView('home')} /> : null;
+      case 'mix': return viewId ? <MixPage mixId={viewId} onBack={() => setCurrentView('home')} mixSourceTrack={(navigateState.mix as any)?.mixSourceTrack} /> : null;
       default: return <Home onNavigate={handleNavigate} />;
     }
   };
@@ -152,8 +156,8 @@ const ZunoApp: React.FC = () => {
             <ChevronUp size={22} strokeWidth={2.5} />
           </button>
 
-          <PlayerBar />
-          <FullScreenPlayer />
+          <PlayerBar onNavigate={handleNavigate} />
+          <FullScreenPlayer onNavigate={handleNavigate} />
           <MobileNav currentView={currentView} setView={setCurrentView} />
         </>
       )}

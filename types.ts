@@ -24,6 +24,8 @@ export interface Track {
   loudness?: number; // -60 to 0 dB
   mode?: number; // 0 (minor) or 1 (major)
   key?: number; // 0-11 (pitch class)
+  /** Tidal Mix ID for "Start Mix" (like Monochrome TRACK_MIX) */
+  mixes?: { TRACK_MIX?: string };
 }
 
 export enum ContextType {
@@ -67,6 +69,16 @@ export interface Playlist {
   updatedAt: number;
 }
 
+/** Tidal Mix (algorithmic playlist from API) */
+export interface Mix {
+  id: string;
+  title: string;
+  subTitle?: string;
+  description?: string;
+  mixType?: string;
+  cover?: string;
+}
+
 export type RepeatMode = 'off' | 'all' | 'one';
 
 export enum PlayerStatus {
@@ -88,7 +100,7 @@ export interface PlayerState {
   repeatMode: RepeatMode;
 }
 
-export type View = 'home' | 'search' | 'library' | 'artist' | 'album' | 'playlist' | 'likedSongs' | 'likedAlbums';
+export type View = 'home' | 'search' | 'library' | 'artist' | 'album' | 'playlist' | 'mix' | 'likedSongs' | 'likedAlbums';
 
 // Lyrics Types
 export interface LyricsLine {

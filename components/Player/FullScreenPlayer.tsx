@@ -1,11 +1,16 @@
 import React, { useState, useRef } from 'react';
 import { usePlayer } from '../../store/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, ChevronDown, Shuffle, Repeat, Volume2, VolumeX, Download, Music2, FileText, Heart } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, ChevronDown, Shuffle, Repeat, Volume2, VolumeX, Download, Music2, FileText, Heart, Radio, Sparkles } from 'lucide-react';
 import { DownloadService } from '../../services/download';
 import { toast } from '../UI/Toast';
 import { LyricsPanel } from './LyricsPanel';
+import { View } from '../../types';
 
-export const FullScreenPlayer: React.FC = () => {
+interface FullScreenPlayerProps {
+  onNavigate?: (view: View, id?: string, state?: Record<string, unknown>) => void;
+}
+
+export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }) => {
     const {
         currentTrack,
         status,
@@ -29,6 +34,8 @@ export const FullScreenPlayer: React.FC = () => {
         lyricsLoading,
         isLiked,
         toggleLike,
+        radioLoading,
+        startRadioFromTrack,
     } = usePlayer();
 
     const [showLyrics, setShowLyrics] = useState(false);
@@ -189,22 +196,39 @@ export const FullScreenPlayer: React.FC = () => {
                     </button>
                 </div>
 
-                <button
-                    className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
-                    onClick={async () => {
-                        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-                        if (isMobile) {
-                            // On mobile, save to browser storage
-                            await DownloadService.downloadTrack(currentTrack, true);
-                        } else {
-                            // On desktop, show option or auto-detect
-                            const saveToBrowser = window.confirm('Salvar no navegador para uso offline? (Sim) ou Baixar ZIP? (Não)');
-                            await DownloadService.downloadTrack(currentTrack, saveToBrowser);
-                        }
-                    }}
-                >
-                    <Download size={24} />
-                </button>
+                <div className="flex items-center gap-2">
+                    {currentTrack?.mixes?.TRACK_MIX && onNavigate && (
+                        <button
+                            onClick={() => onNavigate('mix', currentTrack.mixes!.TRACK_MIX, { mixSourceTrack: currentTrack })}
+                            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                            title="Abrir Mix desta faixa"
+                        >
+                            <Sparkles size={24} />
+                        </button>
+                    )}
+                    <button
+                        onClick={() => startRadioFromTrack(currentTrack)}
+                        disabled={radioLoading}
+                        className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors disabled:opacity-50"
+                        title="Radio — músicas do artista"
+                    >
+                        <Radio size={24} className={radioLoading ? 'animate-pulse' : ''} />
+                    </button>
+                    <button
+                        className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                        onClick={async () => {
+                            const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+                            if (isMobile) {
+                                await DownloadService.downloadTrack(currentTrack, true);
+                            } else {
+                                const saveToBrowser = window.confirm('Salvar no navegador para uso offline? (Sim) ou Baixar ZIP? (Não)');
+                                await DownloadService.downloadTrack(currentTrack, saveToBrowser);
+                            }
+                        }}
+                    >
+                        <Download size={24} />
+                    </button>
+                </div>
             </div>
 
             {/* Main Content */}

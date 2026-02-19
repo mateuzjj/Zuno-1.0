@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Play, Sparkles, Clock, Disc, UserPlus, UserCheck } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Play, Sparkles, Clock, Disc, UserPlus, UserCheck, Radio } from 'lucide-react';
 import { api } from '../services/api';
 import { Artist, Album, Track } from '../types';
 import { usePlayer } from '../store/PlayerContext';
@@ -7,6 +7,17 @@ import { FollowService } from '../services/followService';
 import { toast } from '../components/UI/Toast';
 
 import { View } from '../types';
+
+const CHUNK_SIZE = 3;
+
+function shuffleArray<T>(arr: T[]): T[] {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
 
 interface ArtistPageProps {
     artistId: string;
@@ -20,6 +31,54 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
     const [topTracks, setTopTracks] = useState<Track[]>([]);
     const [isFollowing, setIsFollowing] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [radioLoading, setRadioLoading] = useState(false);
+
+    const startArtistRadio = useCallback(async () => {
+        if (!artist || albums.length === 0) {
+            toast.show('Nenhum álbum encontrado para este artista', 'info');
+            return;
+        }
+        setRadioLoading(true);
+        try {
+            const trackSet = new Set<string>();
+            const allTracks: Track[] = [];
+            const chunks: Album[][] = [];
+            for (let i = 0; i < albums.length; i += CHUNK_SIZE) {
+                chunks.push(albums.slice(i, i + CHUNK_SIZE));
+            }
+            for (const chunk of chunks) {
+                const results = await Promise.all(
+                    chunk.map(async (album) => {
+                        try {
+                            const { tracks } = await api.getAlbum(album.id);
+                            return tracks;
+                        } catch (err) {
+                            console.warn(`Failed to fetch album ${album.title}:`, err);
+                            return [];
+                        }
+                    })
+                );
+                results.flat().forEach((track) => {
+                    if (!trackSet.has(track.id)) {
+                        trackSet.add(track.id);
+                        allTracks.push(track);
+                    }
+                });
+            }
+            if (allTracks.length === 0) {
+                toast.show('Nenhuma faixa encontrada nos álbuns', 'info');
+                return;
+            }
+            const shuffled = shuffleArray(allTracks);
+            playTrack(shuffled[0], shuffled);
+            toast.show(`Radio: ${shuffled.length} faixas de ${artist.name}`, 'success');
+        } catch (error) {
+            console.error('Artist radio failed:', error);
+            toast.show('Não foi possível iniciar o rádio do artista', 'error');
+        } finally {
+            setRadioLoading(false);
+        }
+    }, [artist, albums, playTrack]);
 
     useEffect(() => {
         const loadData = async () => {
@@ -89,12 +148,25 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
 
                 <div className="absolute bottom-0 left-0 p-8 md:p-12">
                     <h1 className="text-5xl md:text-7xl font-bold mb-4 drop-shadow-2xl">{artist.name}</h1>
-                    <div className="flex gap-4">
+                    <div className="flex flex-wrap gap-3">
                         <button
                             onClick={() => topTracks.length > 0 && playTrack(topTracks[0], topTracks)}
                             className="bg-zuno-accent text-black px-8 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 transition-transform"
                         >
                             <Play fill="currentColor" size={20} /> Play
+                        </button>
+                        <button
+                            onClick={startArtistRadio}
+                            disabled={radioLoading || albums.length === 0}
+                            className="bg-white/10 text-white px-6 py-3 rounded-full font-bold flex items-center gap-2 hover:scale-105 hover:bg-white/20 transition-all disabled:opacity-50 disabled:pointer-events-none border border-white/10"
+                            title="Radio — tocar todas as faixas do artista em ordem aleatória"
+                        >
+                            {radioLoading ? (
+                                <Sparkles size={20} className="animate-spin" />
+                            ) : (
+                                <Radio size={20} />
+                            )}
+                            <span>{radioLoading ? 'Carregando...' : 'Radio'}</span>
                         </button>
                         <button
                             onClick={toggleFollow}

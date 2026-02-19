@@ -1,0 +1,33 @@
+---
+description: Usar o projeto Monochrome como referência para API, UI, Mix, Radio e fluxos
+alwaysApply: true
+---
+
+# Referência: Projeto Monochrome
+
+Ao implementar ou debugar funcionalidades no Zuno, **consulte o projeto Monochrome** como referência.
+
+## Caminho do projeto
+
+- **Monochrome:** `C:\Users\Admin\Desktop\monochrome`
+
+## O que consultar
+
+1. **API (formato de resposta, endpoints, parsing)**
+   - `monochrome/js/api.js` — `getMix`, `getArtist`, `getAlbum`, `getPlaylist`, `prepareTrack`, `prepareArtist`, normalização de respostas.
+
+2. **UI e fluxos**
+   - `monochrome/js/ui.js` — páginas (Mix, Artist, Album, Playlist), cards, hero, listas de faixas.
+   - `monochrome/js/events.js` — ações (track-mix, play-card, start-mix, download).
+
+3. **Player e Mix/Radio**
+   - `monochrome/js/player.js` — fila, botão Mix na faixa atual (`TRACK_MIX`), setQueue.
+   - `monochrome/js/router.js` — rota `mix` e navegação.
+
+4. **Estrutura de dados**
+   - Tracks com `mixes.TRACK_MIX`; artistas com `mixes.ARTIST_MIX`; como o Monochrome mapeia e usa esses campos.
+
+## Como usar
+
+- Ao implementar algo novo (ex.: nova página, novo endpoint, botão Mix/Radio), verificar no Monochrome como está feito e alinhar nomes, fluxos e formato de dados quando fizer sentido.
+- Ao corrigir bugs (ex.: Mix com 0 faixas), comparar o parsing da resposta no Zuno com o do Monochrome (`api.js` getMix, formato de `data.items` / `data.tracks`).

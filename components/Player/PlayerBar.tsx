@@ -1,12 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { usePlayer } from '../../store/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download, Shuffle, Repeat, Repeat1, Heart } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Maximize2, Download, Shuffle, Repeat, Repeat1, Heart, Radio, Sparkles } from 'lucide-react';
 import { DownloadService } from '../../services/download';
 import { toast } from '../UI/Toast';
-import { PlayerStatus } from '../../types';
+import { PlayerStatus, View } from '../../types';
 
-export const PlayerBar: React.FC = () => {
-  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode, isLiked, toggleLike, currentLyrics, lyricsLoading } = usePlayer();
+interface PlayerBarProps {
+  onNavigate?: (view: View, id?: string, state?: Record<string, unknown>) => void;
+}
+
+export const PlayerBar: React.FC<PlayerBarProps> = ({ onNavigate }) => {
+  const { currentTrack, status, currentTime, togglePlay, nextTrack, prevTrack, seek, volume, setVolume, toggleMute, isMuted, toggleExpanded, shuffleEnabled, toggleShuffle, repeatMode, cycleRepeatMode, isLiked, toggleLike, currentLyrics, lyricsLoading, radioLoading, startRadioFromTrack } = usePlayer();
   const [isVisible, setIsVisible] = useState(true);
   const lastScrollY = useRef(0);
 
@@ -154,16 +158,41 @@ export const PlayerBar: React.FC = () => {
             </div>
           </div>
 
-          {/* Like Button */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleLike();
-            }}
-            className={`ml-auto transition-colors hover:scale-110 ${isLiked ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
-          >
-            <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-          </button>
+          {/* Radio, Mix & Like */}
+          <div className="ml-auto flex items-center gap-2">
+            {currentTrack?.mixes?.TRACK_MIX && onNavigate && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onNavigate('mix', currentTrack.mixes!.TRACK_MIX, { mixSourceTrack: currentTrack });
+                }}
+                className="text-zuno-muted hover:text-white transition-colors hover:scale-110"
+                title="Abrir Mix desta faixa"
+              >
+                <Sparkles size={20} />
+              </button>
+            )}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                startRadioFromTrack(currentTrack);
+              }}
+              disabled={radioLoading}
+              className="text-zuno-muted hover:text-white transition-colors hover:scale-110 disabled:opacity-50 disabled:pointer-events-none"
+              title="Radio — tocar músicas do artista em ordem aleatória"
+            >
+              <Radio size={20} className={radioLoading ? 'animate-pulse' : ''} />
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleLike();
+              }}
+              className={`transition-colors hover:scale-110 ${isLiked ? 'text-zuno-accent' : 'text-zuno-muted hover:text-white'}`}
+            >
+              <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+            </button>
+          </div>
         </div>
 
         {/* Controls & Scrubber */}
