@@ -153,9 +153,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
 
             {/* Ambient color orbs */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute rounded-full" style={{ width: '70vmax', height: '70vmax', top: '-25%', left: '-20%', background: 'radial-gradient(circle, #1ED760 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.18, animation: 'orb-drift-1 18s ease-in-out infinite alternate' }} />
-                <div className="absolute rounded-full" style={{ width: '60vmax', height: '60vmax', bottom: '-25%', right: '-15%', background: 'radial-gradient(circle, #7A4CFF 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.15, animation: 'orb-drift-2 22s ease-in-out infinite alternate' }} />
-                <div className="absolute rounded-full" style={{ width: '50vmax', height: '50vmax', top: '35%', left: '40%', background: 'radial-gradient(circle, #3B82F6 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.12, animation: 'orb-drift-3 26s ease-in-out infinite alternate' }} />
+                <div className="absolute rounded-full" style={{ width: '70vmax', height: '70vmax', top: '-25%', left: '-20%', background: 'radial-gradient(circle, #5B8CFF 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.18, animation: 'orb-drift-1 18s ease-in-out infinite alternate' }} />
+                <div className="absolute rounded-full" style={{ width: '60vmax', height: '60vmax', bottom: '-25%', right: '-15%', background: 'radial-gradient(circle, #9B5CFF 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.15, animation: 'orb-drift-2 22s ease-in-out infinite alternate' }} />
+                <div className="absolute rounded-full" style={{ width: '50vmax', height: '50vmax', top: '35%', left: '40%', background: 'radial-gradient(circle, #5B8CFF 0%, transparent 60%)', filter: 'blur(80px)', opacity: 0.12, animation: 'orb-drift-3 26s ease-in-out infinite alternate' }} />
             </div>
 
             {/* Album cover blur */}
@@ -263,10 +263,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                             <path
                                 d={describeArc(center, center, radius, ARC_START, ARC_CURRENT)}
                                 fill="none"
-                                stroke="#1ED760"
+                                stroke="#5B8CFF"
                                 strokeWidth={strokeWidth}
                                 strokeLinecap="round"
-                                className="drop-shadow-[0_0_10px_rgba(30,215,96,0.5)]"
+                                className="drop-shadow-[0_0_10px_rgba(91,140,255,0.5)]"
                             />
                         </svg>
 

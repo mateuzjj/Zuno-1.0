@@ -26,7 +26,7 @@ export const Card: React.FC<CardProps> = ({ image, title, subtitle, onClick, onP
         {/* Play Button Overlay */}
         <button
           onClick={onPlay}
-          className="absolute bottom-2 right-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 bg-zuno-accent text-black p-3.5 rounded-full shadow-xl hover:scale-105 hover:bg-green-400"
+          className="absolute bottom-2 right-2 translate-y-4 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300 bg-zuno-accent text-black p-3.5 rounded-full shadow-xl hover:scale-105 hover:bg-zuno-accent/90"
         >
           <Play fill="currentColor" size={20} className="pl-0.5" />
         </button>

@@ -1,9 +1,12 @@
 import { Album, Playlist, Track } from "./types";
 
-// ZUNO Branding Palette (for reference in TS logic if needed)
+// ZUNO Branding Palette — base imersiva, primária tecnológica, secundária criativa
 export const ZUNO_COLORS = {
-  black: '#0B0B0E',
-  accent: '#1ED760',
+  base: '#0B0F1A',
+  primary: '#5B8CFF',
+  secondary: '#9B5CFF',
+  black: '#0B0F1A',
+  accent: '#5B8CFF',
 };
 
 // Mock Audio URL (Copyright free sample for demo purposes)

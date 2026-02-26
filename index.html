@@ -15,9 +15,9 @@
   <!-- Android & PWA Meta Tags -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="application-name" content="ZUNO" />
-  <meta name="theme-color" content="#000000" />
-  <meta name="msapplication-TileColor" content="#000000" />
-  <meta name="msapplication-navbutton-color" content="#000000" />
+  <meta name="theme-color" content="#0B0F1A" />
+  <meta name="msapplication-TileColor" content="#0B0F1A" />
+  <meta name="msapplication-navbutton-color" content="#0B0F1A" />
 
   <!-- Icons -->
   <link rel="apple-touch-icon" href="/icon.png" />
@@ -45,15 +45,17 @@
           },
           colors: {
             zuno: {
-              black: '#050505',
-              main: '#080808',
-              card: '#0f0f0f',
-              light: '#1a1a1a',
-              accent: '#1ED760',
-              purple: '#7A4CFF',
-              blue: '#3B82F6',
+              black: '#0B0F1A',
+              main: '#0B0F1A',
+              dark: '#0f1420',
+              card: '#111827',
+              light: '#1a2332',
+              accent: '#5B8CFF',
+              secondary: '#9B5CFF',
+              purple: '#9B5CFF',
+              blue: '#5B8CFF',
               text: '#FFFFFF',
-              muted: '#B3B3B3'
+              muted: '#94A3B8'
             }
           },
           borderRadius: {
@@ -69,7 +71,7 @@
   </script>
   <style>
     body {
-      background-color: #050505;
+      background-color: #0B0F1A;
       color: #FFFFFF;
       -webkit-font-smoothing: antialiased;
       -webkit-tap-highlight-color: transparent;
@@ -84,36 +86,6 @@
       z-index: 0;
       pointer-events: none;
       overflow: hidden;
-    }
-    #zuno-ambient-bg .orb {
-      position: absolute;
-      border-radius: 50%;
-      filter: blur(80px);
-      will-change: transform, opacity;
-    }
-    #zuno-ambient-bg .orb-1 {
-      width: 70vmax;
-      height: 70vmax;
-      top: -25%;
-      left: -20%;
-      background: radial-gradient(circle, #1ED760 0%, transparent 60%);
-      animation: orb-drift-1 18s ease-in-out infinite alternate;
-    }
-    #zuno-ambient-bg .orb-2 {
-      width: 65vmax;
-      height: 65vmax;
-      bottom: -25%;
-      right: -15%;
-      background: radial-gradient(circle, #7A4CFF 0%, transparent 60%);
-      animation: orb-drift-2 22s ease-in-out infinite alternate;
-    }
-    #zuno-ambient-bg .orb-3 {
-      width: 55vmax;
-      height: 55vmax;
-      top: 30%;
-      left: 40%;
-      background: radial-gradient(circle, #3B82F6 0%, transparent 60%);
-      animation: orb-drift-3 26s ease-in-out infinite alternate;
     }
 
     @keyframes orb-drift-1 {
@@ -134,17 +106,47 @@
 
     /* Transparent overlay for content areas */
     .zuno-bg-main-transparent {
-      background-color: rgba(5, 5, 5, 0.50) !important;
+      background-color: rgba(11, 15, 26, 0.50) !important;
     }
     .zuno-bg-card-transparent {
-      background-color: rgba(10, 10, 10, 0.55) !important;
+      background-color: rgba(17, 24, 39, 0.55) !important;
       -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
     }
     .zuno-bg-sidebar-transparent {
-      background-color: rgba(5, 5, 5, 0.45) !important;
+      background-color: rgba(11, 15, 26, 0.45) !important;
       -webkit-backdrop-filter: blur(20px);
       backdrop-filter: blur(20px);
+    }
+    #zuno-ambient-bg .orb {
+      position: absolute;
+      border-radius: 50%;
+      filter: blur(80px);
+      will-change: transform, opacity;
+    }
+    #zuno-ambient-bg .orb-1 {
+      width: 70vmax;
+      height: 70vmax;
+      top: -25%;
+      left: -20%;
+      background: radial-gradient(circle, #5B8CFF 0%, transparent 60%);
+      animation: orb-drift-1 18s ease-in-out infinite alternate;
+    }
+    #zuno-ambient-bg .orb-2 {
+      width: 65vmax;
+      height: 65vmax;
+      bottom: -25%;
+      right: -15%;
+      background: radial-gradient(circle, #9B5CFF 0%, transparent 60%);
+      animation: orb-drift-2 22s ease-in-out infinite alternate;
+    }
+    #zuno-ambient-bg .orb-3 {
+      width: 55vmax;
+      height: 55vmax;
+      top: 30%;
+      left: 40%;
+      background: radial-gradient(circle, #5B8CFF 0%, transparent 60%);
+      animation: orb-drift-3 26s ease-in-out infinite alternate;
     }
 
     #root {
@@ -160,6 +162,34 @@
     textarea,
     select {
       font-size: 16px !important;
+    }
+
+    /* EQ sliders: draggable on Safari iOS (evitar touch-action que bloqueia arraste) */
+    input.eq-slider[type="range"] {
+      touch-action: manipulation;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 8px;
+      border-radius: 4px;
+      background: rgba(255,255,255,0.1);
+    }
+    input.eq-slider[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #5B8CFF;
+      cursor: pointer;
+      margin-top: -7px;
+    }
+    input.eq-slider[type="range"]::-moz-range-thumb {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #5B8CFF;
+      cursor: pointer;
+      border: none;
     }
 
     /* iOS Smooth Scrolling */
@@ -178,12 +208,12 @@
     }
 
     ::-webkit-scrollbar-thumb {
-      background: #1a1a1a;
+      background: #1a2332;
       border-radius: 4px;
     }
 
     ::-webkit-scrollbar-thumb:hover {
-      background: #2a2a2a;
+      background: #243044;
     }
 
     .hide-scrollbar::-webkit-scrollbar {

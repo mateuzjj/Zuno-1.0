@@ -145,8 +145,8 @@ export const PullToRefresh: React.FC<PullToRefreshProps> = ({ onRefresh, childre
                     <Zap
                         size={40 * indicatorScale}
                         className={`lightning-bolt ${isReady ? 'ready' : ''} ${isRefreshing ? 'refreshing' : ''}`}
-                        fill="#22c55e"
-                        color="#22c55e"
+                        fill="#5B8CFF"
+                        color="#5B8CFF"
                     />
                 </div>
                 {isReady && !isRefreshing && (

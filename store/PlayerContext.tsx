@@ -2,11 +2,20 @@ import React, { createContext, useContext, useState, useRef, useEffect, useCallb
 import { PlayerState, PlayerStatus, Track, RepeatMode, Lyrics } from '../types';
 import { api } from '../services/api';
 import { LyricsService } from '../services/lyricsService';
+import { equalizerManager, EQ_FREQUENCIES, EQ_PRESETS } from '../services/equalizer';
 import { toast } from '../components/UI/Toast';
+
+let _cachedDownloadModule: any = null;
+async function getCachedDownloadService() {
+  if (!_cachedDownloadModule) {
+    _cachedDownloadModule = await import('../services/download');
+  }
+  return _cachedDownloadModule;
+}
 
 const RADIO_CHUNK_SIZE = 3;
 
-function shuffleTracks(arr: Track[]): Track[] {
+function shuffleArray<T>(arr: T[]): T[] {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -14,6 +23,8 @@ function shuffleTracks(arr: Track[]): Track[] {
   }
   return a;
 }
+
+let _loadIdCounter = 0;
 
 interface PlayerContextType extends PlayerState {
   isExpanded: boolean;
@@ -34,6 +45,14 @@ interface PlayerContextType extends PlayerState {
   toggleLike: () => void;
   radioLoading: boolean;
   startRadioFromTrack: (track: Track) => Promise<void>;
+  equalizerEnabled: boolean;
+  setEqualizerEnabled: (enabled: boolean) => void;
+  eqGains: number[];
+  setEqBandGain: (index: number, gain: number) => void;
+  applyEqPreset: (key: string) => void;
+  resetEq: () => void;
+  eqPresets: typeof EQ_PRESETS;
+  eqFrequencies: number[];
 }
 
 const PlayerContext = createContext<PlayerContextType | undefined>(undefined);
@@ -56,6 +75,8 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [isExpanded, setIsExpanded] = useState(false);
   const [currentLyrics, setCurrentLyrics] = useState<Lyrics | null>(null);
   const [lyricsLoading, setLyricsLoading] = useState(false);
+  const [equalizerEnabled, setEqualizerEnabledState] = useState(() => equalizerManager.isEnabled());
+  const [eqGains, setEqGainsState] = useState<number[]>(() => equalizerManager.getGains());
 
   // Refs to avoid stale closures in event handlers
   const repeatModeRef = useRef<RepeatMode>(repeatMode);
@@ -65,78 +86,78 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const volumeRef = useRef<number>(volume);
   const isMutedRef = useRef<boolean>(isMuted);
   const playTrackInternalRef = useRef<((track: Track) => Promise<void>) | null>(null);
-  const nextStreamUrlRef = useRef<{ id: string; url: string } | null>(null);
+  const nextStreamUrlRef = useRef<{ id: string; url: string; blobUrl?: string } | null>(null);
+  const activeLoadIdRef = useRef(0);
 
-  // Helper function to shuffle an array
-  const shuffleArray = <T,>(array: T[]): T[] => {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-  };
-
-  // Helper to actually load and play a track
   const playTrackInternal = async (track: Track) => {
     if (!audioRef.current) return;
 
-    // UI Feedback immediately
+    const loadId = ++_loadIdCounter;
+    activeLoadIdRef.current = loadId;
+
+    audioRef.current.pause();
+    const prevSrc = audioRef.current.src;
+    if (prevSrc && prevSrc.startsWith('blob:')) {
+      URL.revokeObjectURL(prevSrc);
+    }
+    audioRef.current.removeAttribute('src');
+    audioRef.current.load();
+
     setCurrentTrack(track);
     setStatus(PlayerStatus.LOADING);
     setCurrentTime(0);
-    // Use track duration as fallback until metadata loads
     setDuration(track.duration || 0);
 
     try {
       let streamUrl: string;
 
-      // 0. Check Preloaded URL first (Fastest for background playback)
-      if (nextStreamUrlRef.current && nextStreamUrlRef.current.id === track.id) {
-        streamUrl = nextStreamUrlRef.current.url;
-        console.log('[Player] Using preloaded stream URL');
-        // Clear cache
+      const preloaded = nextStreamUrlRef.current;
+      if (preloaded && preloaded.id === track.id) {
+        streamUrl = preloaded.blobUrl || preloaded.url;
         nextStreamUrlRef.current = null;
       } else {
-        // 1. Check if track is downloaded locally first
-        const { DownloadService } = await import('../services/download');
+        const { DownloadService } = await getCachedDownloadService();
+        if (activeLoadIdRef.current !== loadId) return;
+
         const downloadedUrl = await DownloadService.getDownloadedTrackUrl(track.id);
+        if (activeLoadIdRef.current !== loadId) return;
 
         if (downloadedUrl) {
-          // Use downloaded track from IndexedDB
           streamUrl = downloadedUrl;
-          console.log('[Player] Using downloaded track from IndexedDB');
         } else {
-          // Get the stream URL from API (async operation)
           streamUrl = await api.getStreamUrl(track.id);
+          if (activeLoadIdRef.current !== loadId) return;
           if (!streamUrl) throw new Error("Stream URL not found");
         }
       }
 
-      // 2. Set Audio Source - use refs to get current values
-      audioRef.current.src = streamUrl;
-      audioRef.current.volume = volumeRef.current;
-      audioRef.current.muted = isMutedRef.current;
+      if (activeLoadIdRef.current !== loadId) return;
 
-      // 3. Play
-      try {
-        await audioRef.current.play();
-        setStatus(PlayerStatus.PLAYING);
-        setIsExpanded(true); // Auto expand on play (optional, but good for "Modern" vibes)
-      } catch (playError: any) {
-        console.error("Play failed:", playError);
-        // Se falhar por autoplay, tentar novamente quando houver interação do usuário
-        if (playError.name === 'NotAllowedError') {
-          console.warn('[Player] Autoplay blocked - waiting for user interaction');
-          setStatus(PlayerStatus.PAUSED); // Marcar como pausado, não erro
-        } else {
-          setStatus(PlayerStatus.ERROR);
-        }
+      audioRef.current.src = streamUrl;
+      if (equalizerManager.isInitialized()) {
+        audioRef.current.volume = 1;
+        equalizerManager.setVolume(isMutedRef.current ? 0 : volumeRef.current);
+      } else {
+        audioRef.current.volume = volumeRef.current;
+        audioRef.current.muted = isMutedRef.current;
       }
 
-    } catch (err) {
-      console.error("Playback failed:", err);
-      setStatus(PlayerStatus.ERROR);
+      await equalizerManager.resume();
+      if (activeLoadIdRef.current !== loadId) return;
+      await audioRef.current.play();
+      setStatus(PlayerStatus.PLAYING);
+
+    } catch (err: any) {
+      if (activeLoadIdRef.current !== loadId) return;
+      if (err.name === 'NotAllowedError') {
+        console.warn('[Player] Autoplay blocked - waiting for user interaction');
+        setStatus(PlayerStatus.PAUSED);
+      } else if (err.name === 'AbortError') {
+        // Interrupted by a newer load — ignore silently
+      } else {
+        console.error('[Player] Playback failed:', err);
+        setStatus(PlayerStatus.ERROR);
+      }
     }
   };
 
@@ -172,35 +193,32 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   useEffect(() => {
     const audio = new Audio();
     audioRef.current = audio;
-    audio.crossOrigin = "anonymous"; // Essential for visualizers or CDN issues
+    audio.crossOrigin = "anonymous";
+    audio.preload = "auto";
+    equalizerManager.init(audio);
 
-    const updateTime = () => setCurrentTime(audio.currentTime);
+    let lastTimeUpdate = 0;
+    const updateTime = () => {
+      const now = performance.now();
+      if (now - lastTimeUpdate < 250) return;
+      lastTimeUpdate = now;
+      setCurrentTime(audio.currentTime);
+    };
     const updateDuration = () => {
       if (!Number.isNaN(audio.duration)) setDuration(audio.duration);
     };
     const handleEnded = () => {
-      // Handle repeat and queue logic - use refs to get current values
       const currentRepeatMode = repeatModeRef.current;
       const currentQueue = queueRef.current;
       const currentIdx = currentIndexRef.current;
       const playTrackFn = playTrackInternalRef.current;
 
-      console.log('[Player] Track ended. Queue length:', currentQueue.length, 'Current index:', currentIdx, 'Repeat mode:', currentRepeatMode);
-
-      if (!playTrackFn) {
-        console.warn('[Player] No playTrackFn available');
-        return;
-      }
-
-      if (currentQueue.length === 0) {
-        console.log('[Player] Queue is empty, stopping');
+      if (!playTrackFn || currentQueue.length === 0) {
         setStatus(PlayerStatus.STOPPED);
         return;
       }
 
       if (currentRepeatMode === 'one') {
-        // Repeat current track
-        console.log('[Player] Repeating current track');
         if (audioRef.current) {
           audioRef.current.currentTime = 0;
           audioRef.current.play().catch(console.error);
@@ -208,63 +226,31 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         return;
       }
 
-      // Calculate next index
       const nextIdx = currentIdx + 1;
 
       if (nextIdx >= currentQueue.length) {
-        // We're at the end of the queue
         if (currentRepeatMode === 'all') {
-          // Loop back to the start
-          console.log('[Player] End of queue, looping to start (repeat all)');
           const firstTrk = currentQueue[0];
           if (firstTrk) {
             setCurrentIndex(0);
             playTrackFn(firstTrk);
           }
         } else {
-          // Repeat is off, stop playback
-          console.log('[Player] End of queue, stopping (repeat off)');
           setStatus(PlayerStatus.STOPPED);
         }
       } else {
-        // Normal case: advance to next track
         const nextTrk = currentQueue[nextIdx];
-        console.log('[Player] Advancing to next track:', nextTrk?.title, 'at index', nextIdx);
         if (nextTrk) {
           setCurrentIndex(nextIdx);
           playTrackFn(nextTrk);
         } else {
-          console.warn('[Player] Next track not found at index', nextIdx);
           setStatus(PlayerStatus.STOPPED);
         }
       }
     };
-    const handleCanPlay = () => {
-      // Tentar reproduzir se não estiver já tocando
-      if (statusRef.current !== PlayerStatus.PLAYING) {
-        audio.play()
-          .then(() => {
-            setStatus(PlayerStatus.PLAYING);
-            console.log('[Player] Auto-play successful');
-          })
-          .catch(e => {
-            console.warn('[Player] Auto-play blocked:', e);
-            setStatus(PlayerStatus.PAUSED);
-          });
-      }
-    };
-    const handleLoadedData = () => {
-      if (statusRef.current === PlayerStatus.LOADING) {
-        audio.play()
-          .then(() => setStatus(PlayerStatus.PLAYING))
-          .catch(e => {
-            console.warn('[Player] Auto-play blocked on loadeddata:', e);
-            setStatus(PlayerStatus.PAUSED);
-          });
-      }
-    };
     const handleError = (e: any) => {
-      console.error("Audio error:", e);
+      if (!audio.src || audio.src === '' || audio.src === window.location.href) return;
+      console.error('[Player] Audio error:', e);
       setStatus(PlayerStatus.ERROR);
     };
 
@@ -272,8 +258,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     audio.addEventListener('durationchange', updateDuration);
     audio.addEventListener('loadedmetadata', updateDuration);
     audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('canplay', handleCanPlay);
-    audio.addEventListener('loadeddata', handleLoadedData);
     audio.addEventListener('error', handleError);
 
     return () => {
@@ -281,13 +265,11 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       audio.removeEventListener('durationchange', updateDuration);
       audio.removeEventListener('loadedmetadata', updateDuration);
       audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('canplay', handleCanPlay);
-      audio.removeEventListener('loadeddata', handleLoadedData);
       audio.removeEventListener('error', handleError);
       audio.pause();
       audio.src = "";
     };
-  }, []); // Empty dependency array ok here as we use refs/state setters
+  }, []);
 
   // Track History Logic
   useEffect(() => {
@@ -316,14 +298,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const loadLyrics = async () => {
       setLyricsLoading(true);
       try {
-        console.log('[Lyrics] Loading for track:', {
-          id: currentTrack.id,
-          title: currentTrack.title,
-          artist: currentTrack.artist,
-          album: currentTrack.album,
-          duration: currentTrack.duration
-        });
-
         const lyrics = await LyricsService.getLyricsForTrack(
           currentTrack.id,
           currentTrack.title,
@@ -331,9 +305,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
           currentTrack.album,
           currentTrack.duration
         );
-
-        console.log('[Lyrics] Loaded:', lyrics ? (lyrics.instrumental ? 'Instrumental' : `${lyrics.syncedLyrics?.length || 0} synced lines, plain: ${!!lyrics.plainLyrics}`) : 'Not found');
-        console.log('[Lyrics] Full lyrics object:', lyrics);
         setCurrentLyrics(lyrics);
       } catch (error) {
         console.error('[Lyrics] Failed to load:', error);
@@ -346,13 +317,13 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     loadLyrics();
   }, [currentTrack]);
 
-  // Preload Next Track URL (Fix for iOS Background Autoplay)
   useEffect(() => {
     if (!currentTrack || queue.length <= 1) return;
 
+    const controller = new AbortController();
+
     const preloadNext = async () => {
       try {
-        // Determine next track
         let nextIdx = currentIndex + 1;
         if (nextIdx >= queue.length) {
           if (repeatMode === 'off') return;
@@ -360,26 +331,50 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
 
         const nextTrk = queue[nextIdx];
-        if (!nextTrk || (nextStreamUrlRef.current && nextStreamUrlRef.current.id === nextTrk.id)) return;
+        if (!nextTrk) return;
+        if (nextStreamUrlRef.current?.id === nextTrk.id) return;
 
-        console.log('[Player] Preloading next track:', nextTrk.title);
-        const { DownloadService } = await import('../services/download');
+        // Revoke old preloaded blob if switching to a different track
+        if (nextStreamUrlRef.current?.blobUrl) {
+          URL.revokeObjectURL(nextStreamUrlRef.current.blobUrl);
+          nextStreamUrlRef.current = null;
+        }
+
+        const { DownloadService } = await getCachedDownloadService();
         const downloadedUrl = await DownloadService.getDownloadedTrackUrl(nextTrk.id);
 
         if (downloadedUrl) {
-          nextStreamUrlRef.current = { id: nextTrk.id, url: downloadedUrl };
-        } else {
-          const url = await api.getStreamUrl(nextTrk.id);
-          if (url) {
+          nextStreamUrlRef.current = { id: nextTrk.id, url: downloadedUrl, blobUrl: downloadedUrl };
+          return;
+        }
+
+        const url = await api.getStreamUrl(nextTrk.id);
+        if (!url || controller.signal.aborted) return;
+
+        // Pre-fetch actual audio data as blob for instant playback on track switch
+        try {
+          const response = await fetch(url, { signal: controller.signal });
+          if (response.ok) {
+            const blob = await response.blob();
+            if (controller.signal.aborted) return;
+            const blobUrl = URL.createObjectURL(blob);
+            nextStreamUrlRef.current = { id: nextTrk.id, url, blobUrl };
+          } else {
             nextStreamUrlRef.current = { id: nextTrk.id, url };
           }
+        } catch (e: any) {
+          if (e.name === 'AbortError') return;
+          // URL-only fallback if blob fetch fails
+          nextStreamUrlRef.current = { id: nextTrk.id, url };
         }
-      } catch (e) {
-        console.warn('[Player] Preload failed', e);
+      } catch {
+        // Preload is best-effort; failures are non-critical
       }
     };
 
     preloadNext();
+
+    return () => { controller.abort(); };
   }, [currentTrack, queue, currentIndex, repeatMode]);
 
   // Media Session API (Lock Screen Controls & Metadata)
@@ -428,16 +423,6 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
       }],
       ['previoustrack', () => {
-        // Use the logic from prevTrack but accessible here. 
-        // We can expose prevTrack via a ref or just duplicate the simple logic if we have access to queueRef etc.
-        // It's better to expose the latest prevTrack function via a ref or just reuse the logic carefully.
-        // Since playTrackInternalRef is available, we can replicate the logic or better yet:
-        // Let's use a ref for the high-level control functions if they depend on state that might be stale in a closure
-        // But `nextTrack` and `prevTrack` defined in the component depend on `queue`, `currentIndex`, etc.
-        // To avoid stale closures in these handlers without re-binding them constantly, 
-        // we can wrap the calls to `nextTrack` and `prevTrack` in a ref-based dispatcher or just use the refs we already have.
-
-        // Re-implementing simplified logic using refs to ensure freshness:
         const queue = queueRef.current;
         const index = currentIndexRef.current;
         const repeat = repeatModeRef.current;
@@ -539,36 +524,16 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [radioLoading, setRadioLoading] = useState(false);
 
   const playTrack = async (track: Track, newQueue?: Track[]) => {
-    console.log('[Player] playTrack called:', {
-      trackTitle: track.title,
-      newQueueLength: newQueue?.length,
-      currentQueueLength: queue.length,
-      shuffleEnabled
-    });
-
     if (newQueue && newQueue.length > 0) {
-      // New queue provided
       setOriginalQueue(newQueue);
       const finalQueue = shuffleEnabled ? shuffleArray([...newQueue]) : newQueue;
       setQueue(finalQueue);
-
-      // Find index of track in the new queue
       const idx = finalQueue.findIndex(t => t.id === track.id);
       setCurrentIndex(idx >= 0 ? idx : 0);
-
-      console.log('[Player] Queue setup:', {
-        queueLength: finalQueue.length,
-        currentIndex: idx >= 0 ? idx : 0,
-        tracks: finalQueue.map(t => t.title)
-      });
     } else if (queue.length === 0) {
-      // No queue, single track playback
       setQueue([track]);
       setOriginalQueue([track]);
       setCurrentIndex(0);
-      console.log('[Player] Single track playback');
-    } else {
-      console.log('[Player] Using existing queue, length:', queue.length);
     }
 
     await playTrackInternal(track);
@@ -609,7 +574,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         toast.show('Nenhuma faixa encontrada.', 'info');
         return;
       }
-      const shuffled = shuffleTracks(allTracks);
+      const shuffled = shuffleArray(allTracks);
       playTrack(shuffled[0], shuffled);
       toast.show(`Radio: ${shuffled.length} faixas de ${artist.name}`, 'success');
     } catch (e) {
@@ -620,15 +585,20 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   }, [playTrack]);
 
-  const togglePlay = () => {
+  const togglePlay = async () => {
     if (!audioRef.current || !currentTrack) return;
 
     if (status === PlayerStatus.PLAYING) {
       audioRef.current.pause();
       setStatus(PlayerStatus.PAUSED);
     } else if (status === PlayerStatus.PAUSED || status === PlayerStatus.STOPPED) {
-      audioRef.current.play().catch(console.error);
-      setStatus(PlayerStatus.PLAYING);
+      try {
+        await equalizerManager.resume();
+        await audioRef.current.play();
+        setStatus(PlayerStatus.PLAYING);
+      } catch (e) {
+        console.error('[Player] togglePlay failed:', e);
+      }
     }
   };
 
@@ -641,46 +611,54 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
   const setVolume = (vol: number) => {
     if (audioRef.current) {
-      audioRef.current.volume = vol;
-      setVolumeState(vol);
-      volumeRef.current = vol;
+      const effectiveVol = Math.max(0, Math.min(1, vol));
+      if (equalizerManager.isInitialized()) {
+        audioRef.current.volume = 1;
+        equalizerManager.setVolume(effectiveVol);
+      } else {
+        audioRef.current.volume = effectiveVol;
+      }
+      setVolumeState(effectiveVol);
+      volumeRef.current = effectiveVol;
 
-      // Se o volume foi ajustado para > 0 e estava mudo, desmutar
-      if (vol > 0 && isMuted) {
+      if (effectiveVol > 0 && isMuted) {
         setIsMuted(false);
         audioRef.current.muted = false;
         isMutedRef.current = false;
       }
-
-      // Atualizar o volume antes do mute se não estiver mudo
       if (!isMuted) {
-        setVolumeBeforeMute(vol);
+        setVolumeBeforeMute(effectiveVol);
       }
     }
   };
 
   const toggleMute = () => {
-    if (audioRef.current) {
-      const newMuted = !isMuted;
-
-      if (newMuted) {
-        // Mutando: salvar volume atual e definir para 0
-        setVolumeBeforeMute(volume);
-        audioRef.current.volume = 0;
-        volumeRef.current = 0;
-        setVolumeState(0); // Fix: Update state to keep it consistent
+    if (!audioRef.current) return;
+    const newMuted = !isMuted;
+    if (newMuted) {
+      setVolumeBeforeMute(volume);
+      if (equalizerManager.isInitialized()) {
+        audioRef.current.volume = 1;
+        equalizerManager.setVolume(0);
       } else {
-        // Desmutando: restaurar volume anterior ou 0.5 se não houver
-        const volumeToRestore = volumeBeforeMute > 0 ? volumeBeforeMute : 0.5;
-        audioRef.current.volume = volumeToRestore;
-        volumeRef.current = volumeToRestore;
-        setVolumeState(volumeToRestore);
+        audioRef.current.volume = 0;
       }
-
-      setIsMuted(newMuted);
-      isMutedRef.current = newMuted;
-      audioRef.current.muted = newMuted;
+      volumeRef.current = 0;
+      setVolumeState(0);
+    } else {
+      const volumeToRestore = volumeBeforeMute > 0 ? volumeBeforeMute : 0.5;
+      if (equalizerManager.isInitialized()) {
+        audioRef.current.volume = 1;
+        equalizerManager.setVolume(volumeToRestore);
+      } else {
+        audioRef.current.volume = volumeToRestore;
+      }
+      volumeRef.current = volumeToRestore;
+      setVolumeState(volumeToRestore);
     }
+    setIsMuted(newMuted);
+    isMutedRef.current = newMuted;
+    audioRef.current.muted = newMuted;
   };
 
   const toggleExpanded = () => setIsExpanded(prev => !prev);
@@ -780,6 +758,26 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }
   };
 
+  const setEqualizerEnabled = (enabled: boolean) => {
+    equalizerManager.setEnabled(enabled);
+    setEqualizerEnabledState(enabled);
+  };
+
+  const setEqBandGain = (index: number, gain: number) => {
+    equalizerManager.setBandGain(index, gain);
+    setEqGainsState(equalizerManager.getGains());
+  };
+
+  const applyEqPreset = (key: string) => {
+    equalizerManager.applyPreset(key);
+    setEqGainsState(equalizerManager.getGains());
+  };
+
+  const resetEq = () => {
+    equalizerManager.reset();
+    setEqGainsState(equalizerManager.getGains());
+  };
+
   return (
     <PlayerContext.Provider value={{
       currentTrack,
@@ -807,7 +805,15 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       isLiked,
       toggleLike,
       radioLoading,
-      startRadioFromTrack
+      startRadioFromTrack,
+      equalizerEnabled,
+      setEqualizerEnabled,
+      eqGains,
+      setEqBandGain,
+      applyEqPreset,
+      resetEq,
+      eqPresets: EQ_PRESETS,
+      eqFrequencies: EQ_FREQUENCIES
     }}>
       {children}
     </PlayerContext.Provider>

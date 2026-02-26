@@ -1,24 +1,27 @@
 import { MOCK_ALBUMS, MOCK_PLAYLISTS, MOCK_TRACKS } from "../constants";
 import { Album, Playlist, Track } from "../types";
 
-// API Instances — Monochrome first (referência: monochrome/public/instances.json)
-// Para Mix retornar playlist real (vários artistas), priorizar instâncias que devolvem data.items
+// API Instances — ordered by benchmark (fastest + working stream first)
+// Instances that return 403 on /track/ or are offline are moved to the end as fallback
 const API_INSTANCES = [
+  // Tier 1: fast & fully working (search + stream OK)
+  "https://hifi-two.spotisaver.net",
+  "https://hifi-one.spotisaver.net",
+  "https://arran.monochrome.tf",
+  // Tier 2: working but slower
+  "https://hund.qqdl.site",
+  "https://katze.qqdl.site",
+  "https://vogel.qqdl.site",
+  "https://maus.qqdl.site",
+  "https://wolf.qqdl.site",
+  // Tier 3: search works but stream returns 403 (fallback only)
   "https://eu-central.monochrome.tf",
   "https://us-west.monochrome.tf",
-  "https://arran.monochrome.tf",
   "https://api.monochrome.tf",
-  "https://triton.squid.wtf",
-  "https://wolf.qqdl.site",
-  "https://tidal-api.binimum.org",
   "https://monochrome-api.samidy.com",
-  "https://maus.qqdl.site",
-  "https://vogel.qqdl.site",
-  "https://katze.qqdl.site",
-  "https://hund.qqdl.site",
   "https://tidal.kinoplus.online",
-  "https://hifi-one.spotisaver.net",
-  "https://hifi-two.spotisaver.net"
+  "https://tidal-api.binimum.org",
+  "https://triton.squid.wtf"
 ];
 
 const RATE_LIMIT_ERROR_MESSAGE = 'Too Many Requests. Please wait a moment and try again.';
@@ -68,23 +71,23 @@ function getArtistPictureUrl(id: string | undefined, size = '750'): string {
 const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Helper to fetch with retry across instances (Load Balancing & Failover)
+const INSTANCE_TIMEOUT = 6000;
+
 async function fetchWithRetry(relativePath: string, options: RequestInit = {}): Promise<Response> {
-  const maxRetries = 3;
+  const maxRetries = 2;
   let lastError: Error | null = null;
 
-  // Try preferred instances first, then shuffle the rest
-  const preferred = API_INSTANCES.slice(0, 2);
-  const others = API_INSTANCES.slice(2).sort(() => Math.random() - 0.5);
-  const sortedInstances = [...preferred, ...others];
-
-  for (const baseUrl of sortedInstances) {
+  for (const baseUrl of API_INSTANCES) {
     const url = baseUrl.endsWith('/')
       ? `${baseUrl}${relativePath.startsWith('/') ? relativePath.substring(1) : relativePath}`
       : `${baseUrl}${relativePath.startsWith('/') ? relativePath : '/' + relativePath}`;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const response = await fetch(url, options);
+        const response = await fetch(url, {
+          ...options,
+          signal: options.signal || AbortSignal.timeout(INSTANCE_TIMEOUT),
+        });
 
         if (response.status === 429) {
           throw new Error(RATE_LIMIT_ERROR_MESSAGE);
@@ -94,23 +97,27 @@ async function fetchWithRetry(relativePath: string, options: RequestInit = {}): 
           return response;
         }
 
+        // 4xx = client error / instance doesn't support this endpoint — skip immediately, no retry
+        if (response.status >= 400 && response.status < 500) {
+          lastError = new Error(`${response.status} from ${baseUrl}`);
+          break;
+        }
+
+        // 5xx = server error — retry on same instance
         if (response.status >= 500 && attempt < maxRetries) {
-          await delay(200 * attempt);
+          await delay(150 * attempt);
           continue;
         }
 
-        // If 4xx error (not 429), it might be a real error (not found), so we might not want to retry
-        if (response.status >= 400 && response.status < 500) {
-          // However, sometimes instances return 404 if they are broken, so we try a few times across instances
-          throw new Error(`Request failed with status ${response.status}`);
-        }
-
-        lastError = new Error(`Request failed with status ${response.status}`);
-        break; // Break inner loop to try next instance
+        lastError = new Error(`${response.status} from ${baseUrl}`);
+        break;
       } catch (error: any) {
         lastError = error;
+        if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+          break;
+        }
         if (attempt < maxRetries) {
-          await delay(200 * attempt);
+          await delay(150 * attempt);
         }
       }
     }
