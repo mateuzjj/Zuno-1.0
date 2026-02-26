@@ -195,6 +195,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     audioRef.current = audio;
     audio.crossOrigin = "anonymous";
     audio.preload = "auto";
+    // iOS: playsInline + não usar Web Audio no equalizer = áudio continua com tela bloqueada (Media Session API).
+    audio.setAttribute('playsinline', 'true');
+    (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
     equalizerManager.init(audio);
 
     let lastTimeUpdate = 0;
@@ -377,12 +380,17 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return () => { controller.abort(); };
   }, [currentTrack, queue, currentIndex, repeatMode]);
 
-  // Media Session API (Lock Screen Controls & Metadata)
+  // Media Session API (Lock Screen / Control Center no iOS — necessário para áudio em segundo plano)
   useEffect(() => {
-    if (!currentTrack || !('mediaSession' in navigator) || typeof MediaMetadata === 'undefined') return;
+    if (!('mediaSession' in navigator)) return;
 
     try {
-      // Update Metadata
+      if (!currentTrack || typeof MediaMetadata === 'undefined') {
+        navigator.mediaSession.metadata = null;
+        navigator.mediaSession.playbackState = 'none';
+        return;
+      }
+
       navigator.mediaSession.metadata = new MediaMetadata({
         title: currentTrack.title,
         artist: currentTrack.artist,
@@ -397,12 +405,10 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         ]
       });
 
-      // Update Playback State
       navigator.mediaSession.playbackState = status === PlayerStatus.PLAYING ? 'playing' : 'paused';
     } catch (error) {
       console.error("Error updating media session metadata:", error);
     }
-
   }, [currentTrack, status]);
 
   // Setup Media Session Action Handlers
