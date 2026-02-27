@@ -773,11 +773,19 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   };
 
   const setEqBandGain = (index: number, gain: number) => {
+    if (!equalizerEnabled) {
+      setEqualizerEnabledState(true);
+      equalizerManager.setEnabled(true);
+    }
     equalizerManager.setBandGain(index, gain);
     setEqGainsState(equalizerManager.getGains());
   };
 
   const applyEqPreset = (key: string) => {
+    if (!equalizerEnabled) {
+      setEqualizerEnabledState(true);
+      equalizerManager.setEnabled(true);
+    }
     equalizerManager.applyPreset(key);
     setEqGainsState(equalizerManager.getGains());
   };

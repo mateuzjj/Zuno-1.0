@@ -115,6 +115,14 @@ function savePreset(preset: string): void {
   }
 }
 
+/** No Safari iOS, o AudioContext é suspenso quando o app vai para segundo plano ou a tela bloqueia.
+ * O áudio para de sair pelo gráfico do Web Audio. Para manter a música em segundo plano (Media Session API),
+ * não usamos Web Audio no iOS: o áudio toca direto pelo elemento <audio>. O equalizador fica sem efeito no iOS. */
+function isIOS(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).userAgentData;
+}
+
 class EqualizerManager {
   private ctx: AudioContext | null = null;
   private source: MediaElementAudioSourceNode | null = null;
@@ -127,6 +135,7 @@ class EqualizerManager {
   init(audio: HTMLAudioElement): void {
     if (typeof window === 'undefined' || !audio) return;
     if (this.ctx != null) return;
+    if (isIOS()) return;
     const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AC) return;
     try {
@@ -162,16 +171,32 @@ class EqualizerManager {
 
   private connectGraph(): void {
     if (!this.source || !this.ctx || !this.gainNode) return;
-    this.source.disconnect();
-    this.gainNode.disconnect();
+    try {
+      this.source.disconnect();
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.gainNode.disconnect();
+    } catch {
+      /* ignore */
+    }
     let node: AudioNode = this.source;
     if (this.enabled && this.filters.length > 0) {
       for (let i = 0; i < this.filters.length - 1; i++) {
-        this.filters[i].disconnect();
+        try {
+          this.filters[i].disconnect();
+        } catch {
+          /* ignore */
+        }
         node.connect(this.filters[i]);
         node = this.filters[i];
       }
-      this.filters[this.filters.length - 1].disconnect();
+      try {
+        this.filters[this.filters.length - 1].disconnect();
+      } catch {
+        /* ignore */
+      }
       node.connect(this.filters[this.filters.length - 1]);
       node = this.filters[this.filters.length - 1];
     }
