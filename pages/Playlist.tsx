@@ -228,7 +228,7 @@ export const PlaylistPage: React.FC<PlaylistPageProps> = ({ playlistId, onBack }
                             return (
                                 <div
                                     key={track.id}
-                                    className="group flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer border-b border-white/5 last:border-0"
+                                    className={`track-list-item group flex items-center gap-4 p-3 rounded-lg transition-colors cursor-pointer border-b border-white/5 last:border-0 ${currentTrack?.id === track.id ? 'bg-white/5' : ''}`}
                                     onClick={() => handlePlayTrack(index)}
                                 >
                                     {/* Index/Play Button */}
@@ -241,8 +241,8 @@ export const PlaylistPage: React.FC<PlaylistPageProps> = ({ playlistId, onBack }
                                             </div>
                                         ) : (
                                             <>
-                                                <span className="group-hover:hidden">{index + 1}</span>
-                                                <Play size={16} className="hidden group-hover:block text-white" />
+                                                <span className="track-list-item-num">{index + 1}</span>
+                                                <Play size={16} className="track-list-item-play-btn hidden text-white" />
                                             </>
                                         )}
                                     </div>
@@ -260,7 +260,7 @@ export const PlaylistPage: React.FC<PlaylistPageProps> = ({ playlistId, onBack }
                                     {/* Track Info */}
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2">
-                                            <h3 className={`font-medium truncate text-lg ${isPlaying ? 'text-zuno-accent' : 'text-white group-hover:text-zuno-accent transition-colors'}`}>
+                                            <h3 className={`font-medium truncate text-lg ${isPlaying ? 'text-zuno-accent' : 'text-white transition-colors group-hover:text-zuno-accent'}`}>
                                                 {track.title}
                                             </h3>
                                             {downloadedTrackIds.has(track.id) && (

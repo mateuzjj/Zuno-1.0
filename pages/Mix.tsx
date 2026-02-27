@@ -30,7 +30,7 @@ interface MixPageProps {
 }
 
 export const MixPage: React.FC<MixPageProps> = ({ mixId, onBack, mixSourceTrack }) => {
-    const { playTrack, startRadioFromTrack } = usePlayer();
+    const { playTrack, startRadioFromTrack, currentTrack, status } = usePlayer();
     const [mix, setMix] = useState<MixType | null>(null);
     const [tracks, setTracks] = useState<Track[]>([]);
     const [loading, setLoading] = useState(true);
@@ -150,22 +150,26 @@ export const MixPage: React.FC<MixPageProps> = ({ mixId, onBack, mixSourceTrack 
                     </div>
                 )}
                 <div className="space-y-1">
-                    {tracks.map((track, idx) => (
-                        <div
-                            key={track.id}
-                            onClick={() => playTrack(track, tracks)}
-                            className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group cursor-pointer transition-colors border-b border-white/5 last:border-0"
-                        >
-                            <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-medium text-white group-hover:text-zuno-accent transition-colors text-lg truncate">{track.title}</h4>
-                                <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                    {tracks.map((track, idx) => {
+                        const isCurrentTrack = currentTrack?.id === track.id;
+                        const isPlaying = isCurrentTrack && status === 'PLAYING';
+                        return (
+                            <div
+                                key={track.id}
+                                onClick={() => playTrack(track, tracks)}
+                                className={`track-list-item flex items-center gap-4 p-3 rounded-lg group cursor-pointer transition-colors border-b border-white/5 last:border-0 ${isCurrentTrack ? 'bg-white/5' : ''}`}
+                            >
+                                <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                    <h4 className={`track-list-item-title font-medium transition-colors text-lg truncate ${isPlaying ? 'text-zuno-accent' : 'text-white'}`}>{track.title}</h4>
+                                    <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                                </div>
+                                <span className="text-sm text-gray-500 font-mono flex-shrink-0">
+                                    {formatDuration(track.duration)}
+                                </span>
                             </div>
-                            <span className="text-sm text-gray-500 font-mono flex-shrink-0">
-                                {formatDuration(track.duration)}
-                            </span>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>

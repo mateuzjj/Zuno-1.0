@@ -81,10 +81,11 @@ export const LikedSongs: React.FC = () => {
                     {likedTracks.map((track, index) => {
                         const isPlaying = currentTrack?.id === track.id && status === 'PLAYING';
 
+                        const isCurrentTrack = currentTrack?.id === track.id;
                         return (
                             <div
                                 key={track.id}
-                                className="group flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                className={`track-list-item group flex items-center gap-4 p-3 rounded-lg transition-colors cursor-pointer ${isCurrentTrack ? 'bg-white/5' : ''}`}
                                 onClick={() => handlePlayTrack(track)}
                             >
                                 {/* Index/Play Button */}
@@ -97,8 +98,8 @@ export const LikedSongs: React.FC = () => {
                                         </div>
                                     ) : (
                                         <>
-                                            <span className="text-sm text-zuno-muted group-hover:hidden">{index + 1}</span>
-                                            <Play size={16} className="hidden group-hover:block text-white" />
+                                            <span className="track-list-item-num text-sm text-zuno-muted">{index + 1}</span>
+                                            <Play size={16} className="track-list-item-play-btn hidden text-white" />
                                         </>
                                     )}
                                 </div>

@@ -371,6 +371,35 @@
       }
     }
 
+    /* Home: hover só em dispositivos com hover real (evita destaque que “desce” no scroll em touch) */
+    @media (hover: hover) and (pointer: fine) {
+      .home-track-item:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+      .home-track-item:hover .home-track-item-play {
+        opacity: 1;
+      }
+    }
+
+    /* Listas de faixas: hover só com mouse (pointer: fine), evita destaque ao rolar em touch */
+    @media (hover: hover) and (pointer: fine) {
+      .track-list-item:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+      .track-list-item:hover .track-list-item-play {
+        opacity: 1;
+      }
+      .track-list-item:hover .track-list-item-title {
+        color: #5B8CFF;
+      }
+      .track-list-item:hover .track-list-item-num {
+        display: none;
+      }
+      .track-list-item:hover .track-list-item-play-btn {
+        display: flex;
+      }
+    }
+
     /* Fix for iOS Safari 15+ address bar */
     @supports (height: 100dvh) {
       body {

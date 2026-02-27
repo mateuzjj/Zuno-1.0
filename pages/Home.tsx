@@ -103,7 +103,7 @@ const EmptyState = ({ message, onSearch }: { message: string; onSearch: () => vo
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
-  const { playTrack } = usePlayer();
+  const { playTrack, currentTrack, status } = usePlayer();
 
   // ── Tracks state ──
   const [tracks, setTracks] = useState<Track[]>([]);
@@ -379,38 +379,42 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
             />
           ) : (
             <div className="space-y-1">
-              {tracks.map((track, i) => (
-                <button
-                  key={track.id}
-                  onClick={() => playTrack(track)}
-                  className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 transition-colors group text-left"
-                >
-                  {/* Cover */}
-                  <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
-                    <img
-                      src={track.coverUrl}
-                      alt={track.title}
-                      className="w-full h-full object-cover"
-                      onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/music/48/48'; }}
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Play size={16} fill="white" className="text-white" />
+              {tracks.map((track) => {
+                const isCurrentTrack = currentTrack?.id === track.id;
+                const isPlaying = isCurrentTrack && status === 'PLAYING';
+                return (
+                  <button
+                    key={track.id}
+                    onClick={() => playTrack(track)}
+                    className={`home-track-item w-full flex items-center gap-3 p-3 rounded-xl transition-colors group text-left ${isCurrentTrack ? 'bg-white/5' : ''}`}
+                  >
+                    {/* Cover */}
+                    <div className="relative w-12 h-12 rounded-lg overflow-hidden flex-shrink-0">
+                      <img
+                        src={track.coverUrl}
+                        alt={track.title}
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/music/48/48'; }}
+                      />
+                      <div className={`absolute inset-0 bg-black/60 flex items-center justify-center transition-opacity ${isCurrentTrack ? 'opacity-100' : 'home-track-item-play opacity-0'}`}>
+                        <Play size={16} fill="white" className="text-white" />
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-sm font-medium truncate">{track.title}</p>
-                    <p className="text-zuno-muted text-xs truncate">{track.artist}</p>
-                  </div>
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium truncate ${isPlaying ? 'text-zuno-accent' : 'text-white'}`}>{track.title}</p>
+                      <p className="text-zuno-muted text-xs truncate">{track.artist}</p>
+                    </div>
 
-                  {/* Duration */}
-                  <span className="text-zuno-muted text-xs flex-shrink-0 flex items-center gap-1">
-                    <Clock size={10} />
-                    {formatDuration(track.duration)}
-                  </span>
-                </button>
-              ))}
+                    {/* Duration */}
+                    <span className="text-zuno-muted text-xs flex-shrink-0 flex items-center gap-1">
+                      <Clock size={10} />
+                      {formatDuration(track.duration)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </section>

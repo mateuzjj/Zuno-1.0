@@ -22,7 +22,7 @@ interface AlbumPageProps {
 }
 
 export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
-    const { playTrack } = usePlayer();
+    const { playTrack, currentTrack, status } = usePlayer();
     const [album, setAlbum] = useState<Partial<Album> | null>(null);
     const [tracks, setTracks] = useState<Track[]>([]);
     const [loading, setLoading] = useState(true);
@@ -170,32 +170,36 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
             {/* Tracklist */}
             <div className="px-4 md:px-8">
                 <div className="space-y-1">
-                    {tracks.map((track, idx) => (
-                        <div
-                            key={track.id}
-                            onClick={() => playTrack(track, tracks)}
-                            className="flex items-center gap-4 p-3 rounded-lg hover:bg-white/5 group cursor-pointer transition-colors border-b border-white/5 last:border-0"
-                        >
-                            <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                    <h4 className="font-medium text-white group-hover:text-zuno-accent transition-colors text-lg truncate">{track.title}</h4>
-                                    {downloadedTrackIds.has(track.id) && (
-                                        <CheckCircle2
-                                            size={16}
-                                            className="text-zuno-accent flex-shrink-0"
-                                            fill="currentColor"
-                                            title="Música salva offline"
-                                        />
-                                    )}
+                    {tracks.map((track, idx) => {
+                        const isCurrentTrack = currentTrack?.id === track.id;
+                        const isPlaying = isCurrentTrack && status === 'PLAYING';
+                        return (
+                            <div
+                                key={track.id}
+                                onClick={() => playTrack(track, tracks)}
+                                className={`track-list-item flex items-center gap-4 p-3 rounded-lg group cursor-pointer transition-colors border-b border-white/5 last:border-0 ${isCurrentTrack ? 'bg-white/5' : ''}`}
+                            >
+                                <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <h4 className={`font-medium transition-colors text-lg truncate ${isPlaying ? 'text-zuno-accent' : 'text-white group-hover:text-zuno-accent'}`}>{track.title}</h4>
+                                        {downloadedTrackIds.has(track.id) && (
+                                            <CheckCircle2
+                                                size={16}
+                                                className="text-zuno-accent flex-shrink-0"
+                                                fill="currentColor"
+                                                title="Música salva offline"
+                                            />
+                                        )}
+                                    </div>
+                                    <p className="text-sm text-gray-400 truncate">{track.artist}</p>
                                 </div>
-                                <p className="text-sm text-gray-400 truncate">{track.artist}</p>
+                                <span className="text-sm text-gray-500 font-mono flex-shrink-0">
+                                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+                                </span>
                             </div>
-                            <span className="text-sm text-gray-500 font-mono flex-shrink-0">
-                                {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
-                            </span>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             </div>
         </div>

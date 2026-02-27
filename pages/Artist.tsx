@@ -25,7 +25,7 @@ interface ArtistPageProps {
 }
 
 export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) => {
-    const { playTrack } = usePlayer();
+    const { playTrack, currentTrack, status } = usePlayer();
     const [artist, setArtist] = useState<Artist | null>(null);
     const [albums, setAlbums] = useState<Album[]>([]);
     const [topTracks, setTopTracks] = useState<Track[]>([]);
@@ -204,28 +204,32 @@ export const ArtistPage: React.FC<ArtistPageProps> = ({ artistId, onNavigate }) 
                         <Sparkles size={20} className="text-zuno-accent" /> Popular
                     </h2>
                     <div className="space-y-2">
-                        {topTracks.map((track, idx) => (
-                            <div
-                                key={track.id}
-                                onClick={() => playTrack(track, topTracks)}
-                                className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/5 group cursor-pointer transition-colors"
-                            >
-                                <span className="text-gray-500 w-6 text-center font-mono">{idx + 1}</span>
-                                <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0">
-                                    <img src={track.coverUrl} className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100">
-                                        <Play size={20} fill="white" />
+                        {topTracks.map((track, idx) => {
+                            const isCurrentTrack = currentTrack?.id === track.id;
+                            const isPlaying = isCurrentTrack && status === 'PLAYING';
+                            return (
+                                <div
+                                    key={track.id}
+                                    onClick={() => playTrack(track, topTracks)}
+                                    className={`track-list-item flex items-center gap-4 p-3 rounded-xl group cursor-pointer transition-colors ${isCurrentTrack ? 'bg-white/5' : ''}`}
+                                >
+                                    <span className="text-gray-500 w-6 text-center font-mono">{idx + 1}</span>
+                                    <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0">
+                                        <img src={track.coverUrl} className="w-full h-full object-cover" alt="" />
+                                        <div className={`track-list-item-play absolute inset-0 bg-black/40 flex items-center justify-center transition-opacity ${isCurrentTrack ? 'opacity-100' : 'opacity-0'}`}>
+                                            <Play size={20} fill="white" />
+                                        </div>
                                     </div>
+                                    <div className="flex-1">
+                                        <h4 className={`font-semibold transition-colors ${isPlaying ? 'text-zuno-accent' : 'text-white group-hover:text-zuno-accent'}`}>{track.title}</h4>
+                                        <p className="text-sm text-gray-400">{track.album}</p>
+                                    </div>
+                                    <span className="text-sm text-gray-500 font-mono hidden md:block">
+                                        {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
+                                    </span>
                                 </div>
-                                <div className="flex-1">
-                                    <h4 className="font-semibold text-white group-hover:text-zuno-accent transition-colors">{track.title}</h4>
-                                    <p className="text-sm text-gray-400">{track.album}</p>
-                                </div>
-                                <span className="text-sm text-gray-500 font-mono hidden md:block">
-                                    {Math.floor(track.duration / 60)}:{(track.duration % 60).toString().padStart(2, '0')}
-                                </span>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </section>
 

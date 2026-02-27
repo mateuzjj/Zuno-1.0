@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { usePlayer } from '../../store/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, ChevronDown, Shuffle, Repeat, Volume2, VolumeX, Download, Music2, FileText, Heart, Radio, Sparkles } from 'lucide-react';
+import { ChevronDown, Shuffle, Repeat, Volume2, VolumeX, Download, Music2, FileText, Radio, Sparkles } from 'lucide-react';
 import { DownloadService } from '../../services/download';
 import { toast } from '../UI/Toast';
 import { LyricsPanel } from './LyricsPanel';
@@ -41,6 +41,11 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
     const [showLyrics, setShowLyrics] = useState(false);
     const [isDraggingVolume, setIsDraggingVolume] = useState(false);
     const volumeRef = useRef<HTMLDivElement>(null);
+    const touchStartX = useRef<number | null>(null);
+    const touchStartY = useRef<number | null>(null);
+    const touchEndX = useRef<number | null>(null);
+    const touchEndY = useRef<number | null>(null);
+    const SWIPE_THRESHOLD = 50;
 
     if (!currentTrack || !isExpanded) return null;
 
@@ -142,14 +147,50 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
         seek(Number(e.target.value));
     };
 
-    const getRepeatIcon = () => {
-        if (repeatMode === 'one') return '🔂';
-        if (repeatMode === 'all') return '🔁';
-        return '↻';
+    const handleSwipeStart = (e: React.TouchEvent) => {
+        const target = e.target as Node;
+        if (volumeRef.current?.contains(target)) return;
+        if (target instanceof HTMLInputElement && target.type === 'range') return;
+        touchStartX.current = e.targetTouches[0].clientX;
+        touchStartY.current = e.targetTouches[0].clientY;
+        touchEndX.current = null;
+        touchEndY.current = null;
+    };
+
+    const handleSwipeMove = (e: React.TouchEvent) => {
+        if (touchStartX.current === null) return;
+        touchEndX.current = e.targetTouches[0].clientX;
+        touchEndY.current = e.targetTouches[0].clientY;
+    };
+
+    const handleSwipeEnd = (e: React.TouchEvent) => {
+        if (touchStartX.current === null || touchStartY.current === null) return;
+        const endX = touchEndX.current ?? e.changedTouches[0]?.clientX ?? touchStartX.current;
+        const endY = touchEndY.current ?? e.changedTouches[0]?.clientY ?? touchStartY.current;
+        const dx = endX - touchStartX.current;
+        const dy = endY - touchStartY.current;
+        if (Math.abs(dy) > Math.abs(dx) && dy > SWIPE_THRESHOLD) {
+            toggleExpanded();
+        } else if (Math.abs(dx) > Math.abs(dy)) {
+            if (dx > SWIPE_THRESHOLD) nextTrack();
+            else if (dx < -SWIPE_THRESHOLD) prevTrack();
+        }
+        touchStartX.current = null;
+        touchStartY.current = null;
+        touchEndX.current = null;
+        touchEndY.current = null;
     };
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-bottom duration-500 h-[100dvh] overflow-hidden" style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}>
+        <div
+            className="fixed inset-0 z-[60] bg-black flex flex-col animate-in slide-in-from-bottom duration-500 h-[100dvh] overflow-hidden"
+            style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+            onTouchStart={handleSwipeStart}
+            onTouchMove={handleSwipeMove}
+            onTouchEnd={handleSwipeEnd}
+            role="application"
+            aria-label="Player em tela cheia. Deslize para a direita: próxima faixa; esquerda: faixa anterior; para baixo: minimizar."
+        >
 
             {/* Ambient color orbs */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -167,55 +208,53 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                 <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/70 to-black/90" />
             </div>
 
-            {/* Header */}
-            <div className="relative z-10 flex items-center justify-between p-6 mt-safe shrink-0">
+            {/* Header — barra no topo com safe-area à direita para o download não sair da tela */}
+            <div className="relative z-10 flex items-center justify-between gap-2 sm:gap-3 pl-[max(0.75rem,env(safe-area-inset-left))] pr-[max(0.75rem,env(safe-area-inset-right))] pt-3 pb-3 shrink-0 min-w-0">
                 <button
                     onClick={toggleExpanded}
-                    className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors"
+                    className="w-9 h-9 sm:w-10 sm:h-10 shrink-0 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black"
+                    aria-label="Minimizar player"
                 >
-                    <ChevronDown size={24} />
+                    <ChevronDown size={22} className="sm:w-6 sm:h-6" />
                 </button>
-
-                {/* Tab Switcher */}
-                <div className="flex gap-2 bg-white/5 rounded-full p-1">
+                {/* Tab Switcher — pode encolher em telas estreitas */}
+                <div className="flex gap-1.5 sm:gap-2 bg-white/5 rounded-full p-1 min-w-0 shrink">
                     <button
                         onClick={() => setShowLyrics(false)}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${!showLyrics ? 'bg-white text-black' : 'text-white/60'
-                            }`}
+                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${!showLyrics ? 'bg-white text-black' : 'text-white/60'}`}
                     >
-                        <Music2 size={16} className="inline mr-1" />
+                        <Music2 size={14} className="sm:w-4 sm:h-4 inline mr-1" />
                         Player
                     </button>
                     <button
                         onClick={() => setShowLyrics(true)}
-                        className={`px-4 py-2 rounded-full text-xs font-bold transition-all ${showLyrics ? 'bg-white text-black' : 'text-white/60'
-                            }`}
+                        className={`px-3 sm:px-4 py-1.5 sm:py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap ${showLyrics ? 'bg-white text-black' : 'text-white/60'}`}
                     >
-                        <FileText size={16} className="inline mr-1" />
+                        <FileText size={14} className="sm:w-4 sm:h-4 inline mr-1" />
                         Lyrics
                     </button>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1 sm:gap-2 shrink-0">
                     {currentTrack?.mixes?.TRACK_MIX && onNavigate && (
                         <button
                             onClick={() => onNavigate('mix', currentTrack.mixes!.TRACK_MIX, { mixSourceTrack: currentTrack })}
-                            className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                            className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
                             title="Abrir Mix desta faixa"
                         >
-                            <Sparkles size={24} />
+                            <Sparkles size={20} className="sm:w-6 sm:h-6" />
                         </button>
                     )}
                     <button
                         onClick={() => startRadioFromTrack(currentTrack)}
                         disabled={radioLoading}
-                        className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors disabled:opacity-50"
+                        className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors disabled:opacity-50"
                         title="Radio — músicas do artista"
                     >
-                        <Radio size={24} className={radioLoading ? 'animate-pulse' : ''} />
+                        <Radio size={20} className={`sm:w-6 sm:h-6 ${radioLoading ? 'animate-pulse' : ''}`} />
                     </button>
                     <button
-                        className="w-10 h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors"
+                        className="w-9 h-9 sm:w-10 sm:h-10 flex items-center justify-center text-white/70 hover:text-white transition-colors shrink-0"
                         onClick={async () => {
                             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
                             if (isMobile) {
@@ -225,15 +264,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                                 await DownloadService.downloadTrack(currentTrack, saveToBrowser);
                             }
                         }}
+                        title="Download"
                     >
-                        <Download size={24} />
+                        <Download size={20} className="sm:w-6 sm:h-6" />
                     </button>
                 </div>
             </div>
 
-            {/* Main Content */}
+            {/* Main Content — painel central bem distribuído */}
             {showLyrics ? (
-                <div className="relative z-10 flex-1 min-h-0 px-4">
+                <div className="relative z-10 flex-1 min-h-0 overflow-auto px-4">
                     <LyricsPanel
                         lyrics={currentLyrics}
                         currentTime={currentTime}
@@ -241,10 +281,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                     />
                 </div>
             ) : (
-                /* Player View - Show lyrics below artist name like first image */
-                <div className="relative z-10 flex-1 flex flex-col items-center justify-center min-h-0 px-4">
+                /* Player View — painel central centralizado */
+                <div className="relative z-10 flex-1 min-h-0 flex flex-col items-center justify-center px-4 py-2 overflow-auto">
                     {/* Album Art with Volume Orb */}
-                    <div className="relative w-[35vh] h-[35vh] max-w-[280px] max-h-[280px] md:w-80 md:h-80 flex items-center justify-center select-none mb-8"
+                    <div className="relative w-[30vh] h-[30vh] max-w-[260px] max-h-[260px] md:w-72 md:h-72 flex items-center justify-center select-none mb-4"
                         ref={volumeRef}
                         onPointerDown={handlePointerDown}
                         onPointerMove={handlePointerMove}
@@ -317,18 +357,18 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                         </button>
                     </div>
 
-                    {/* Song Info with Lyrics */}
-                    <div className="text-center max-w-md px-4">
-                        <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
+                    {/* Song Info with Lyrics — área de letras com altura fixa para não distorcer o layout */}
+                    <div className="text-center max-w-md px-4 w-full flex flex-col items-center">
+                        <h2 className="text-xl md:text-2xl font-bold text-white mb-1 truncate w-full">
                             {currentTrack.title}
                         </h2>
-                        <p className="text-sm md:text-base text-zuno-muted mb-6">
+                        <p className="text-sm text-zuno-muted mb-3 truncate w-full">
                             {currentTrack.artist}
                         </p>
 
-                        {/* Lyrics Display - Below artist like first image */}
+                        {/* Lyrics Display — altura fixa (3 linhas) para não interferir nos elementos acima */}
                         {currentLyrics && !currentLyrics.instrumental && (
-                            <div className="space-y-2 text-center">
+                            <div className="space-y-1 text-center min-h-[4.25rem] max-h-[4.25rem] flex flex-col justify-center overflow-hidden w-full">
                                 {(() => {
                                     // Find current line for synced lyrics
                                     if (currentLyrics.syncedLyrics && currentLyrics.syncedLyrics.length > 0) {
@@ -350,15 +390,15 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                                             return (
                                                 <>
                                                     {prevLine && (
-                                                        <p className="text-sm md:text-base text-white/50 transition-all duration-300">
+                                                        <p className="text-sm md:text-base text-white/50 transition-all duration-300 truncate px-1">
                                                             {prevLine.text}
                                                         </p>
                                                     )}
-                                                    <p className="text-base md:text-lg text-white font-bold transition-all duration-300">
+                                                    <p className="text-base md:text-lg text-white font-bold transition-all duration-300 truncate px-1">
                                                         {currentLine.text}
                                                     </p>
                                                     {nextLine && (
-                                                        <p className="text-sm md:text-base text-white/50 transition-all duration-300">
+                                                        <p className="text-sm md:text-base text-white/50 transition-all duration-300 truncate px-1">
                                                             {nextLine.text}
                                                         </p>
                                                     )}
@@ -375,7 +415,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                                                 {lines.map((line, idx) => (
                                                     <p 
                                                         key={idx} 
-                                                        className={`text-sm md:text-base transition-all duration-300 ${
+                                                        className={`text-sm md:text-base transition-all duration-300 truncate px-1 ${
                                                             idx === 1 ? 'text-white font-bold' : 'text-white/50'
                                                         }`}
                                                     >
@@ -391,25 +431,27 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                             </div>
                         )}
                         {lyricsLoading && (
-                            <div className="mt-4">
-                                <p className="text-sm text-white/40 animate-pulse">Loading lyrics...</p>
+                            <div className="min-h-[4.25rem] flex items-center justify-center">
+                                <p className="text-sm text-white/40 animate-pulse">Carregando letra...</p>
                             </div>
+                        )}
+                        {(!currentLyrics || currentLyrics?.instrumental) && !lyricsLoading && (
+                            <div className="min-h-[4.25rem]" aria-hidden />
                         )}
                     </div>
                 </div>
             )}
 
-            {/* Bottom Controls */}
-            <div className="relative z-10 p-4 md:p-6 pb-safe md:pb-12 shrink-0">
+            {/* Bottom Controls — com safe-area horizontal para o tempo não sair da tela */}
+            <div className="relative z-10 px-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] py-4 md:py-6 pb-[max(1rem,env(safe-area-inset-bottom))] md:pb-12 shrink-0" role="region" aria-label="Controles de reprodução">
                 <div className="bg-white/5 backdrop-blur-2xl border border-white/10 rounded-[32px] md:rounded-[40px] p-4 md:p-8 shadow-2xl overflow-hidden relative">
-
                     <div className="absolute inset-0 bg-zuno-accent/5 pointer-events-none mix-blend-overlay" />
 
-                    {/* Time & Scrubber */}
-                    <div className="flex items-center gap-4 mb-6 md:mb-8 relative z-10">
-                        <span className="text-xs font-mono font-medium text-white/60 w-10 text-right">{formatTime(currentTime)}</span>
+                    {/* Time & Waveform — tempo com espaço fixo para não cortar */}
+                    <div className="flex items-center gap-3 md:gap-4 mb-6 md:mb-8 relative z-10 min-w-0">
+                        <span className="text-xs font-mono font-medium text-white/60 min-w-[2.5rem] w-10 text-right shrink-0" aria-hidden="true">{formatTime(currentTime)}</span>
 
-                        <div className="relative flex-1 h-12 flex items-center justify-center gap-[3px] group">
+                        <div className="relative flex-1 min-w-0 h-12 flex items-center justify-center gap-[3px] group">
                             {Array.from({ length: 40 }).map((_, i) => {
                                 const progress = (currentTime / (duration || 1));
                                 const isPast = (i / 40) < progress;
@@ -433,48 +475,51 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({ onNavigate }
                                 value={currentTime}
                                 onChange={handleSeek}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20 touch-none"
-                                style={{
-                                  WebkitAppearance: 'none',
-                                  touchAction: 'none',
-                                }}
+                                style={{ WebkitAppearance: 'none', touchAction: 'none' }}
+                                aria-label="Posição na faixa"
                             />
                         </div>
 
-                        <span className="text-xs font-mono font-medium text-white/60 w-10">{formatTime(duration)}</span>
+                        <span className="text-xs font-mono font-medium text-white/60 min-w-[2.75rem] w-10 text-left shrink-0" aria-hidden="true">{formatTime(duration)}</span>
                     </div>
 
-                    {/* Controls */}
-                    <div className="flex items-center justify-between px-2 md:px-6 relative z-10">
+                    {/* Controles no padrão da barra flutuante: Shuffle | Play/Pause | Repeat (sem anterior/próximo) */}
+                    <div className="flex items-center justify-center gap-8 md:gap-12 px-2 relative z-10">
                         <button
                             onClick={toggleShuffle}
-                            className={`transition-colors p-2 ${shuffleEnabled ? 'text-zuno-accent' : 'text-white/40 hover:text-white'}`}
+                            className={`transition-colors p-2 rounded-full hover:bg-white/5 ${shuffleEnabled ? 'text-zuno-accent' : 'text-white/40 hover:text-white'}`}
+                            aria-label={shuffleEnabled ? 'Desativar ordem aleatória' : 'Ativar ordem aleatória'}
+                            aria-pressed={shuffleEnabled}
                         >
-                            <Shuffle size={20} />
+                            <Shuffle size={22} className="md:w-6 md:h-6" />
                         </button>
 
-                        <div className="flex items-center gap-6 md:gap-10">
-                            <button onClick={prevTrack} className="text-white hover:text-zuno-accent transition-colors opacity-80 hover:opacity-100">
-                                <SkipBack size={24} className="md:w-7 md:h-7" fill="currentColor" strokeWidth={0} />
-                            </button>
-
-                            <button
-                                onClick={togglePlay}
-                                className="w-16 h-16 md:w-20 md:h-20 bg-white rounded-full flex items-center justify-center text-black hover:scale-105 transition-transform shadow-[0_0_30px_rgba(255,255,255,0.3)] active:scale-95"
-                            >
-                                {isPlaying ? <Pause size={28} className="md:w-8 md:h-8" fill="currentColor" strokeWidth={0} /> : <Play size={28} className="md:w-8 md:h-8 ml-1" fill="currentColor" strokeWidth={0} />}
-                            </button>
-
-                            <button onClick={nextTrack} className="text-white hover:text-zuno-accent transition-colors opacity-80 hover:opacity-100">
-                                <SkipForward size={24} className="md:w-7 md:h-7" fill="currentColor" strokeWidth={0} />
-                            </button>
-                        </div>
+                        {/* Mesmo design da barra flutuante: anéis concêntricos + círculo central discreto */}
+                        <button
+                            onClick={togglePlay}
+                            className="relative flex items-center justify-center w-24 h-24 md:w-28 md:h-28 group focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-full"
+                            aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
+                        >
+                            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" aria-hidden>
+                                <circle cx="50" cy="50" r="8" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="1.2" />
+                                <circle cx="50" cy="50" r="14" fill="none" stroke="rgba(255,255,255,0.18)" strokeWidth="1" />
+                                <circle cx="50" cy="50" r="21" fill="none" stroke="rgba(255,255,255,0.14)" strokeWidth="0.8" />
+                                <circle cx="50" cy="50" r="28" fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth="0.7" />
+                                <circle cx="50" cy="50" r="35" fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth="0.5" />
+                                <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.04)" strokeWidth="0.4" />
+                                <circle cx="50" cy="50" r="48" fill="none" stroke="rgba(255,255,255,0.02)" strokeWidth="0.3" />
+                            </svg>
+                            <span className="relative z-10 w-5 h-5 md:w-6 md:h-6 rounded-full bg-white/10 backdrop-blur-sm border border-white/15 group-hover:bg-white/15 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.06)]" />
+                        </button>
 
                         <button
                             onClick={cycleRepeatMode}
-                            className={`transition-colors p-2 ${repeatMode !== 'off' ? 'text-zuno-accent' : 'text-white/40 hover:text-white'}`}
+                            className={`transition-colors p-2 rounded-full hover:bg-white/5 relative ${repeatMode !== 'off' ? 'text-zuno-accent' : 'text-white/40 hover:text-white'}`}
+                            aria-label={repeatMode === 'off' ? 'Ativar repetição' : repeatMode === 'one' ? 'Repetir uma faixa' : 'Repetir todas'}
+                            aria-pressed={repeatMode !== 'off'}
                         >
-                            <Repeat size={20} />
-                            {repeatMode === 'one' && <span className="absolute text-[10px] font-bold">1</span>}
+                            <Repeat size={22} className="md:w-6 md:h-6" />
+                            {repeatMode === 'one' && <span className="absolute -top-0.5 -right-0.5 text-[10px] font-bold text-zuno-accent">1</span>}
                         </button>
                     </div>
                 </div>
