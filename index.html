@@ -400,6 +400,29 @@
       }
     }
 
+    /* Home Álbuns e Artistas recomendados: hover só com mouse */
+    @media (hover: hover) and (pointer: fine) {
+      .home-album-card:hover {
+        background-color: #1a2332;
+        border-color: rgba(255, 255, 255, 0.1);
+      }
+      .home-album-card:hover .home-card-item-play {
+        opacity: 1;
+      }
+      .home-album-card:hover .home-card-item-img {
+        transform: scale(1.05);
+      }
+      .home-artist-card:hover {
+        background-color: rgba(255, 255, 255, 0.05);
+      }
+      .home-artist-card:hover .home-card-item-ring {
+        box-shadow: 0 0 0 2px rgba(91, 140, 255, 0.5);
+      }
+      .home-artist-card:hover .home-card-item-img {
+        transform: scale(1.05);
+      }
+    }
+
     /* Fix for iOS Safari 15+ address bar */
     @supports (height: 100dvh) {
       body {

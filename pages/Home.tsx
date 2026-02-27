@@ -444,16 +444,16 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                 <button
                   key={album.id}
                   onClick={() => onNavigate('album', album.id)}
-                  className="bg-zuno-card rounded-xl p-3 hover:bg-zuno-light transition-all cursor-pointer group text-left border border-white/5 hover:border-white/10"
+                  className="home-album-card bg-zuno-card rounded-xl p-3 transition-all cursor-pointer group text-left border border-white/5"
                 >
                   <div className="relative mb-3 aspect-square rounded-lg overflow-hidden">
                     <img
                       src={album.coverUrl}
                       alt={album.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="home-card-item-img w-full h-full object-cover transition-transform duration-300"
                       onError={(e) => { (e.target as HTMLImageElement).src = 'https://picsum.photos/seed/album/200/200'; }}
                     />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <div className="home-card-item-play absolute inset-0 bg-black/60 opacity-0 transition-opacity flex items-center justify-center">
                       <Play size={28} className="text-white" fill="white" />
                     </div>
                   </div>
@@ -490,13 +490,13 @@ export const Home: React.FC<HomeProps> = ({ onNavigate }) => {
                 <button
                   key={artist.id}
                   onClick={() => onNavigate('artist', artist.id)}
-                  className="flex flex-col items-center gap-2 p-3 rounded-xl hover:bg-white/5 transition-all group text-center"
+                  className="home-artist-card flex flex-col items-center gap-2 p-3 rounded-xl transition-all group text-center"
                 >
-                  <div className="relative w-full aspect-square rounded-full overflow-hidden ring-2 ring-white/10 group-hover:ring-zuno-accent/50 transition-all">
+                  <div className="home-card-item-ring relative w-full aspect-square rounded-full overflow-hidden ring-2 ring-white/10 transition-all">
                     <img
                       src={artist.picture}
                       alt={artist.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      className="home-card-item-img w-full h-full object-cover transition-transform duration-300"
                       onError={(e) => { (e.target as HTMLImageElement).src = `https://picsum.photos/seed/${artist.id}/200/200`; }}
                     />
                   </div>
