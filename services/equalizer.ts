@@ -107,12 +107,6 @@ function loadPreset(): string {
   }
 }
 
-/** iOS suspende AudioContext em segundo plano; para continuar tocando com tela bloqueada não usamos Web Audio no iOS. */
-function isIOS(): boolean {
-  if (typeof navigator === 'undefined') return false;
-  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !(navigator as any).userAgentData;
-}
-
 function savePreset(preset: string): void {
   try {
     localStorage.setItem(STORAGE_PRESET, preset);
@@ -132,10 +126,8 @@ class EqualizerManager {
 
   init(audio: HTMLAudioElement): void {
     if (typeof window === 'undefined' || !audio) return;
-    // No iOS, não usar Web Audio: o AudioContext é suspenso em segundo plano e a música para.
-    // Deixar o <audio> tocar direto permite reprodução em segundo plano com Media Session API.
-    if (isIOS()) return;
-    const AC = window.AudioContext || (window as any).webkitAudioContext;
+    if (this.ctx != null) return;
+    const AC = (window as any).AudioContext || (window as any).webkitAudioContext;
     if (!AC) return;
     try {
       this.ctx = new AC();

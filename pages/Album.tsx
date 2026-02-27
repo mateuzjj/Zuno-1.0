@@ -182,7 +182,7 @@ export const AlbumPage: React.FC<AlbumPageProps> = ({ albumId, onBack }) => {
                                 <span className="text-gray-500 w-8 text-center font-mono text-lg">{idx + 1}</span>
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
-                                        <h4 className={`font-medium transition-colors text-lg truncate ${isPlaying ? 'text-zuno-accent' : 'text-white group-hover:text-zuno-accent'}`}>{track.title}</h4>
+                                        <h4 className={`track-list-item-title font-medium transition-colors text-lg truncate ${isPlaying ? 'text-zuno-accent' : 'text-white'}`}>{track.title}</h4>
                                         {downloadedTrackIds.has(track.id) && (
                                             <CheckCircle2
                                                 size={16}

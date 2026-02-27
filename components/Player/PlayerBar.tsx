@@ -5,6 +5,7 @@ import { DownloadService } from '../../services/download';
 import { getFrequencyLabel } from '../../services/equalizer';
 import { toast } from '../UI/Toast';
 import { PlayerStatus, View } from '../../types';
+import { WaveformScrubber } from './WaveformScrubber';
 
 interface PlayerBarProps {
   onNavigate?: (view: View, id?: string, state?: Record<string, unknown>) => void;
@@ -15,6 +16,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onNavigate }) => {
   const [isVisible, setIsVisible] = useState(true);
   const [eqPanelOpen, setEqPanelOpen] = useState(false);
   const lastScrollY = useRef(0);
+  const isPlaying = status === PlayerStatus.PLAYING;
   const touchStartX = useRef<number | null>(null);
   const touchEndX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
@@ -45,6 +47,7 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onNavigate }) => {
     mainElement.addEventListener('scroll', handleScroll, { passive: true });
     return () => mainElement.removeEventListener('scroll', handleScroll);
   }, []);
+
 
   if (!currentTrack) return null;
 
@@ -235,17 +238,14 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onNavigate }) => {
           </button>
         </div>
 
-        {/* Linha 3: Barra de progresso */}
-        <div className="flex items-center gap-2 w-full">
-          <span className="text-xs text-zuno-muted w-10 text-right font-mono">{formatTime(currentTime)}</span>
-          <div className="relative w-full flex items-center h-4">
-            <input type="range" min={0} max={currentTrack.duration} value={currentTime} onChange={handleSeek}
-              className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-zuno-accent transition-all touch-none"
-              style={{ background: `linear-gradient(to right, #5B8CFF ${(currentTime / currentTrack.duration) * 100}%, rgba(255,255,255,0.12) ${(currentTime / currentTrack.duration) * 100}%)`, WebkitAppearance: 'none', touchAction: 'none' }}
-            />
-          </div>
-          <span className="text-xs text-zuno-muted w-10 font-mono">{formatTime(currentTrack.duration)}</span>
-        </div>
+        {/* Linha 3: Waveform — mesmo componente que o player */}
+        <WaveformScrubber
+          currentTime={currentTime}
+          duration={currentTrack.duration}
+          isPlaying={isPlaying}
+          onSeek={handleSeek}
+          formatTime={formatTime}
+        />
       </div>
 
       {/* ── DESKTOP LAYOUT ── */}
@@ -334,16 +334,13 @@ export const PlayerBar: React.FC<PlayerBarProps> = ({ onNavigate }) => {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 w-full">
-            <span className="text-xs text-zuno-muted w-10 text-right font-mono">{formatTime(currentTime)}</span>
-            <div className="relative w-full flex items-center h-4">
-              <input type="range" min={0} max={currentTrack.duration} value={currentTime} onChange={handleSeek}
-                className="w-full h-1 bg-white/10 rounded-lg appearance-none cursor-pointer accent-white hover:accent-zuno-accent transition-all touch-none"
-                style={{ background: `linear-gradient(to right, #5B8CFF ${(currentTime / currentTrack.duration) * 100}%, rgba(255,255,255,0.12) ${(currentTime / currentTrack.duration) * 100}%)`, WebkitAppearance: 'none', touchAction: 'none' }}
-              />
-            </div>
-            <span className="text-xs text-zuno-muted w-10 font-mono">{formatTime(currentTrack.duration)}</span>
-          </div>
+          <WaveformScrubber
+            currentTime={currentTime}
+            duration={currentTrack.duration}
+            isPlaying={isPlaying}
+            onSeek={handleSeek}
+            formatTime={formatTime}
+          />
         </div>
 
         {/* Volume & Extras (Desktop only) */}

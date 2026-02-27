@@ -133,6 +133,9 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
       if (activeLoadIdRef.current !== loadId) return;
 
+      if (!equalizerManager.isInitialized() && audioRef.current) {
+        equalizerManager.init(audioRef.current);
+      }
       audioRef.current.src = streamUrl;
       if (equalizerManager.isInitialized()) {
         audioRef.current.volume = 1;
@@ -198,7 +201,7 @@ export const PlayerProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     // iOS: playsInline + não usar Web Audio no equalizer = áudio continua com tela bloqueada (Media Session API).
     audio.setAttribute('playsinline', 'true');
     (audio as HTMLAudioElement & { playsInline?: boolean }).playsInline = true;
-    equalizerManager.init(audio);
+    // EQ init no primeiro play (gesto do usuário) para AudioContext funcionar no iOS/Chrome
 
     let lastTimeUpdate = 0;
     const updateTime = () => {
